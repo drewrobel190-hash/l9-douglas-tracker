@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>L9 Boss Tracker</title>
+<link rel="stylesheet" href="style.css">
+
+
+</head>
+
+<body>
+
+<header>
+
+  <div class="header-left">
+      <span class="site-title">
+          🔥 L9 Boss Tracker <span class="aztec">(AzteczX4龙牙)</span>
+      </span>
+  </div>
+
+  <div class="header-center">
+      
+      <div class="select-wrapper">
+          <select id="timezoneSelect">
+              <option value="9">Korea (UTC+9)</option>
+              <option value="8">Philippines (UTC+8)</option>
+              <option value="7">Indonesia / Thailand (UTC+7)</option>
+          </select>
+      </div>
+  </div>
+
+  <div class="header-right">
+    <button id="worldBossBtn" class="map-btn">World Bosses</button>
+    <button id="openMapBtn" class="map-btn">Map</button>
+
+   <button id="historyBtn" class="map-btn">Boss TOD</button>
+    
+
+
+    <button class="admin-btn" onclick="adminLogin()">
+        Admin
+    </button>
+    
+</div>
+
+
+      
+  </div>
+
+</header>
+
+
+<div class="dev-banner">
+    Still doing crazy stuff on this website.
+</div>
+
+<div class="section">
+<h2>🔥 Today</h2>
+<div class="grid" id="todayGrid"></div>
+
+<h2>🌙 Tomorrow</h2>
+<div class="grid" id="tomorrowGrid"></div>
+
+<h2>📅 Coming Soon</h2>
+<div class="grid" id="soonGrid"></div>
+
+<div id="itemPopup" class="item-popup">
+    <div class="item-box">
+
+        <div class="name-wrapper">
+            <img id="itemImage" class="popup-item-img">
+
+            <div class="title-text">
+                <h3 id="itemName"></h3>
+                <p id="itemRarity"></p>
+            </div>
+        </div>
+
+
+       <p id="itemType"></p>
+<p id="itemStats"></p>
+
+<div id="itemOptions" class="item-options"></div>
+<div id="itemStats"></div>
+
+
+<p id="itemDesc"></p>
+<p id="itemLocation"></p>
+
+    </div>
+</div>
+<div id="allLootPopup" class="all-loot-popup" onclick="closeAllLoot(event)">
+    <div class="all-loot-box">
+        <div class="all-loot-header">
+            <h2 id="allLootTitle"></h2>
+            
+        </div>
+        <div id="allLootGrid"></div>
+    </div>
+</div>
+<div id="adminLayer" class="admin-layer">
+  <div class="admin-box">
+
+    <div class="admin-header">
+      <img id="adminBossImage" class="admin-boss-img">
+      <div class="admin-title-group">
+        <h2 id="adminBossName"></h2>
+        <div id="adminCurrentTimer" class="admin-current"></div>
+      </div>
+    </div>
+
+    <div class="admin-inputs">
+
+      <div class="admin-row">
+  <label>Quick Time:</label>
+  <input type="time" id="adminTime">
+</div>
+
+      <div class="admin-row">
+        <label>Custom Date:</label>
+        <input type="date" id="adminDate">
+        <input type="time" id="adminCustomTime">
+        <button id="adminCustomBtn" class="admin-action">Custom Set</button>
+      </div>
+
+      <div class="admin-row">
+        <button id="adminResetBtn" class="admin-action admin-reset">
+          Reset Timer
+        </button>
+      </div>
+
+      <div class="admin-row">
+    <label>Guild:</label>
+    <input type="text" id="adminGuild" placeholder="Enter guild name">
+</div>
+
+<div class="admin-row" id="adminAssistRow">
+  <label style="min-width:70px;">Assist:</label>
+
+  <label style="display:flex;align-items:center;gap:10px;">
+    <input type="checkbox" id="adminAssist">
+    <span>Assist ON</span>
+  </label>
+</div>
+<div class="admin-row" id="adminClaimRow">
+  <label style="min-width:70px;">Loot:</label>
+
+  <label style="display:flex;align-items:center;gap:10px;">
+    <input type="checkbox" id="adminClaim">
+    <span>Our Loot</span>
+  </label>
+</div>
+<div class="admin-row">
+<button id="adminRemoveGuildBtn" class="admin-action admin-reset">
+    Clear Guild
+</button>
+  <button id="adminSetBtn" class="admin-action">
+    Set Edit
+  </button>
+</div>
+
+    </div>
+
+    <button class="admin-close" onclick="closeAdminLayer()">Close</button>
+
+  </div>
+</div>
+
+<div id="mapOverlay" class="map-overlay">
+
+  <div class="map-container">
+
+    <!-- MOVE TABS -->
+    <div class="map-topbar">
+      <button class="map-back-btn" onclick="closeMapOverlay()">
+    ←
+</button>
+      <div class="continent-tab active" data-continent="elsera">
+        El Sera Content
+      </div>
+      <div class="continent-tab" data-continent="kransia">
+        Kransia Continent
+      </div>
+    </div>
+
+    <div class="map-body">
+
+      <!-- SIDEBAR -->
+      <div class="map-sidebar" id="mapSidebar">
+      </div>
+
+      <!-- MAP CONTENT -->
+     <div class="map-content" id="interactiveMap">
+    <div class="map-inner" id="mapInner">
+        <img id="mapImage">
+    </div>
+</div>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+
+
+    </div>
+
+  </div>
+
+</div>
+
+<div id="worldBossOverlay" class="world-overlay">
+
+  <div class="world-overlay-box">
+
+    <div class="world-overlay-header">
+      <h2>🌍 World Bosses</h2>
+      
+    </div>
+
+    <div class="world-overlay-content" id="worldBossContent">
+      <!-- Big boss cards will go here to not be confused or para madaling maalala -->
+    </div>
+
+  </div>
+
+</div>
+
+<div id="historyPopup" class="overlay">
+    <div class="overlay-content">
+        <h2>Boss Death History</h2>
+
+        <div class="history-tabs">
+            <button id="tabDeath" class="history-tab active">Bosses Time of Deaths</button>
+            <button id="tabRecorded" class="history-tab">Time Recorded Set</button>
+        </div>
+
+        <div id="historyList"></div>
+
+        <button onclick="
+    document.getElementById('historyPopup').classList.remove('active');
+    document.body.style.overflow='auto';
+">
+
+            Close
+        </button>
+    </div>
+</div>
+
+
+
+
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/options.js"></script>
+<script src="js/bosses.js"></script>
+<script src="js/lootdata.js"></script>
+<script src="js/continents.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
+
