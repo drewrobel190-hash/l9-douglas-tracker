@@ -60,6 +60,15 @@ let expandedCard = null;
 // Claim a "send slot" in Firebase so only ONE client can send per boss per spawnTime.
 
 let currentAdminUser = null;
+let todaySchedule = [];
+
+const scheduleBtn = document.getElementById("scheduleBtn");
+const schedulePopup = document.getElementById("schedulePopup");
+const scheduleList = document.getElementById("scheduleList");
+const scheduleTime = document.getElementById("scheduleTime");
+const scheduleText = document.getElementById("scheduleText");
+const addScheduleBtn = document.getElementById("addScheduleBtn");
+const scheduleAdminBox = document.getElementById("scheduleAdminBox");
 
 
 function resetCardState(card){
@@ -337,8 +346,8 @@ timezoneSelect.addEventListener("change", function(){
     localStorage.setItem("timezoneOffset", selectedOffset);
     updateTimers();
     sortBosses();
+    renderTodaySchedule();
 });
-
 /* ========================================== */
 
 
@@ -450,6 +459,145 @@ function isTomorrow(spawn, now){
     const tomorrow = new Date(now);
     tomorrow.setDate(now.getDate()+1);
     return isSameDay(spawn, tomorrow);
+}
+
+function getTodayScheduleKey(){
+    const zone =
+        selectedOffset === 9 ? "Asia/Seoul" :
+        selectedOffset === 8 ? "Asia/Manila" :
+        "Asia/Bangkok";
+
+    const now = new Date();
+
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: zone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit"
+    }).formatToParts(now);
+
+    const year = parts.find(p => p.type === "year").value;
+    const month = parts.find(p => p.type === "month").value;
+    const day = parts.find(p => p.type === "day").value;
+
+    return `${year}-${month}-${day}`;
+}
+
+function formatScheduleTime(timestamp){
+    if(!timestamp) return "No Time";
+
+    const zone =
+        selectedOffset === 9 ? "Asia/Seoul" :
+        selectedOffset === 8 ? "Asia/Manila" :
+        "Asia/Bangkok";
+
+    return new Date(timestamp).toLocaleString("en-US", {
+        timeZone: zone,
+        hour: "numeric",
+        minute: "2-digit",
+        hour12: true
+    });
+}
+
+function renderTodaySchedule(){
+    if(!scheduleList) return;
+
+    scheduleList.innerHTML = "";
+
+    if(!todaySchedule || todaySchedule.length === 0){
+        scheduleList.innerHTML = `<div class="schedule-empty">No events for today yet.</div>`;
+        return;
+    }
+
+    todaySchedule.forEach((item, index) => {
+        const row = document.createElement("div");
+        row.className = "schedule-entry";
+
+        row.innerHTML = `
+    <div class="schedule-entry-left">
+        <span class="schedule-time">${formatScheduleTime(item.timestamp)}</span>
+        <span class="schedule-text">${item.text || ""}</span>
+    </div>
+    ${isAdmin ? `<button class="schedule-delete" onclick="deleteScheduleItem(${index})">Delete</button>` : ""}
+`;
+
+        scheduleList.appendChild(row);
+    });
+}
+
+function listenTodaySchedule(){
+    const key = getTodayScheduleKey();
+
+    db.ref(`${DB_ROOT}/dailySchedules/` + key).on("value", snap => {
+        todaySchedule = snap.val() || [];
+        renderTodaySchedule();
+    });
+}
+
+function openSchedulePopup(){
+    if(schedulePopup){
+        schedulePopup.classList.add("active");
+        document.body.style.overflow = "hidden";
+    }
+
+    if(scheduleAdminBox){
+        scheduleAdminBox.style.display = isAdmin ? "block" : "none";
+    }
+
+    renderTodaySchedule();
+}
+
+function closeSchedulePopup(){
+    if(schedulePopup){
+        schedulePopup.classList.remove("active");
+        document.body.style.overflow = "auto";
+    }
+}
+
+function addTodaySchedule(){
+    if(!isAdmin){
+        alert("Admin only.");
+        return;
+    }
+
+    const timeValue = scheduleTime?.value?.trim() || "";
+    const text = scheduleText?.value?.trim() || "";
+
+    if(!text){
+        alert("Please enter an event.");
+        return;
+    }
+
+    if(!timeValue){
+        alert("Please enter a time.");
+        return;
+    }
+
+    const todayKey = getTodayScheduleKey(); // example: 2026-03-23
+    const localDateTime = new Date(`${todayKey}T${timeValue}:00`);
+
+    const updated = [...todaySchedule, {
+        timestamp: localDateTime.getTime(),
+        text
+    }].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+    db.ref(`${DB_ROOT}/dailySchedules/` + todayKey).set(updated);
+
+    if(scheduleTime) scheduleTime.value = "";
+    if(scheduleText) scheduleText.value = "";
+}
+
+function deleteScheduleItem(index){
+    if(!isAdmin){
+        alert("Admin only.");
+        return;
+    }
+
+    const updated = [...todaySchedule];
+    updated.splice(index, 1);
+
+    const key = getTodayScheduleKey();
+    db.ref(`${DB_ROOT}/dailySchedules/` + key).set(updated);
 }
 
 
@@ -1228,6 +1376,7 @@ console.log("LootData:", lootData);
 
 bosses.forEach(createCard);
 updateBadgesUI();
+listenTodaySchedule();
 
 
 
@@ -1278,6 +1427,12 @@ function applyAdminMode(){
 
   const historyBtn = document.getElementById("historyBtn");
   if(historyBtn) historyBtn.style.display = "inline-block";
+
+  if(scheduleAdminBox){
+    scheduleAdminBox.style.display = isAdmin ? "block" : "none";
+  }
+
+  renderTodaySchedule();
 }
 
 
@@ -1391,6 +1546,11 @@ document.addEventListener("keydown", function(e){
             allLootPopup.classList.remove("active");
             document.body.style.overflow = "auto";
         }
+                const schedulePopup = document.getElementById("schedulePopup");
+        if(schedulePopup.classList.contains("active")){
+            schedulePopup.classList.remove("active");
+            document.body.style.overflow = "auto";
+        }
     }
 });
 
@@ -1428,6 +1588,22 @@ function createWorldBossCard(name, level, image, location){
 const openMapBtn = document.getElementById("openMapBtn");
 const mapOverlay = document.getElementById("mapOverlay");
 const mapImage = document.getElementById("mapImage");
+
+if(scheduleBtn){
+    scheduleBtn.onclick = openSchedulePopup;
+}
+
+if(addScheduleBtn){
+    addScheduleBtn.onclick = addTodaySchedule;
+}
+
+if(schedulePopup){
+    schedulePopup.addEventListener("click", function(e){
+        if(e.target === schedulePopup){
+            closeSchedulePopup();
+        }
+    });
+}
 
 openMapBtn.onclick = () => {
     mapOverlay.classList.add("active");
