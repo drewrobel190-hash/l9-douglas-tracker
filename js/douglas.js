@@ -61,6 +61,8 @@ let expandedCard = null;
 
 let currentAdminUser = null;
 let todaySchedule = [];
+let currentScheduleKey = "";
+let currentScheduleRef = null;
 
 const scheduleBtn = document.getElementById("scheduleBtn");
 const schedulePopup = document.getElementById("schedulePopup");
@@ -509,31 +511,54 @@ function renderTodaySchedule(){
         return;
     }
 
-    todaySchedule.forEach((item, index) => {
+    const now = Date.now();
+
+    const validEvents = todaySchedule
+        .map((item, originalIndex) => ({ item, originalIndex }))
+        .filter(entry => (entry.item.timestamp || 0) > now);
+
+    if(validEvents.length === 0){
+        scheduleList.innerHTML = `<div class="schedule-empty">No upcoming events.</div>`;
+        return;
+    }
+
+    validEvents.forEach(({ item, originalIndex }) => {
         const row = document.createElement("div");
         row.className = "schedule-entry";
 
         row.innerHTML = `
-    <div class="schedule-entry-left">
-        <span class="schedule-time">${formatScheduleTime(item.timestamp)}</span>
-        <span class="schedule-text">${item.text || ""}</span>
-    </div>
-    ${isAdmin ? `<button class="schedule-delete" onclick="deleteScheduleItem(${index})">Delete</button>` : ""}
-`;
+            <div class="schedule-entry-left">
+                <span class="schedule-time">${formatScheduleTime(item.timestamp)}</span>
+                <span class="schedule-text">${item.text || ""}</span>
+            </div>
+            ${isAdmin ? `<button class="schedule-delete" onclick="deleteScheduleItem(${originalIndex})">Delete</button>` : ""}
+        `;
 
         scheduleList.appendChild(row);
     });
 }
 
 function listenTodaySchedule(){
-    const key = getTodayScheduleKey();
+    const newKey = getTodayScheduleKey();
 
-    db.ref(`${DB_ROOT}/dailySchedules/` + key).on("value", snap => {
+    // do nothing if same day still
+    if(currentScheduleKey === newKey && currentScheduleRef){
+        return;
+    }
+
+    // remove old listener first
+    if(currentScheduleRef){
+        currentScheduleRef.off();
+    }
+
+    currentScheduleKey = newKey;
+    currentScheduleRef = db.ref(`${DB_ROOT}/dailySchedules/` + currentScheduleKey);
+
+    currentScheduleRef.on("value", snap => {
         todaySchedule = snap.val() || [];
         renderTodaySchedule();
     });
 }
-
 function openSchedulePopup(){
     if(schedulePopup){
         schedulePopup.classList.add("active");
@@ -1440,11 +1465,15 @@ function applyAdminMode(){
 
 function startTimer(){
     updateTimers();
-    setInterval(()=>{
-    updateTimers();
-    if (!isTyping) sortBosses();
-}, 1000);
+    listenTodaySchedule();
 
+    setInterval(() => {
+        updateTimers();
+        listenTodaySchedule(); // checks if day changed
+        renderTodaySchedule();
+
+        if (!isTyping) sortBosses();
+    }, 1000);
 }
 function toggleBossMenu(event, bossName){
     event.stopPropagation();
