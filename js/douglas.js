@@ -17,17 +17,21 @@ const db = firebase.database();
 const DB_ROOT = "douglas";
 const APP_VERSION = "1.0.1";
 
-db.ref(`${DB_ROOT}/bossTimers`).on("value", snap => {
-    cloudData = snap.val() || {};
+async function loadBossData(){
+
+    const bossSnap = await db.ref(`${DB_ROOT}/bossTimers`).once("value");
+    cloudData = bossSnap.val() || {};
+
+    const guildSnap = await db.ref(`${DB_ROOT}/fixedBossGuilds`).once("value");
+    fixedGuildData = guildSnap.val() || {};
+
     updateTimers();
     sortBosses();
-});
+}
 
-db.ref(`${DB_ROOT}/fixedBossGuilds`).on("value", snap => {
-    fixedGuildData = snap.val() || {};
-    updateTimers();
-    sortBosses(); 
-});
+loadBossData();
+
+setInterval(loadBossData, 30000);
 
 window.addEventListener("beforeunload", () => {
     firebase.database().goOffline();
@@ -1469,16 +1473,27 @@ function applyAdminMode(){
 
 
 function startTimer(){
+
     updateTimers();
     listenTodaySchedule();
 
+    // local UI timer only
     setInterval(() => {
+
         updateTimers();
-        listenTodaySchedule(); // checks if day changed
-        renderTodaySchedule();
 
         if (!isTyping) sortBosses();
+
     }, 1000);
+
+    // Firebase schedule refresh
+    setInterval(() => {
+
+        listenTodaySchedule();
+        renderTodaySchedule();
+
+    }, 60000);
+
 }
 function toggleBossMenu(event, bossName){
     event.stopPropagation();
@@ -1942,7 +1957,9 @@ document.getElementById("historyBtn").onclick = function(){
 
     list.innerHTML = "Loading...";
 
-    db.ref(`${DB_ROOT}/bossHistory`).once("value", snap => {
+    db.ref(`${DB_ROOT}/bossHistory`)
+.limitToLast(25)
+.once("value", snap => {
 
         const data = snap.val();
         list.innerHTML = "";
