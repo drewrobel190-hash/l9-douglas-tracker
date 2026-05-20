@@ -28,10 +28,14 @@ db.ref(`${DB_ROOT}/fixedBossGuilds`).on("value", snap => {
     sortBosses(); 
 });
 
+window.addEventListener("beforeunload", () => {
+    firebase.database().goOffline();
+});
+
 // ===== ASSIST FLAGS (SEPARATE FROM bossTimers) =====
 let assistFlags = {};
 
-db.ref(`${DB_ROOT}/assistFlags`).on("value", snap => {
+db.ref(`${DB_ROOT}/assistFlags`).once("value").then(snap => {
   assistFlags = snap.val() || {};
   updateBadgesUI();
 
@@ -46,9 +50,9 @@ db.ref(`${DB_ROOT}/assistFlags`).on("value", snap => {
 // ===== OUR LOOT FLAGS (SEPARATE) =====
 let claimFlags = {};
 
-db.ref(`${DB_ROOT}/claimFlags`).on("value", snap => {
+db.ref(`${DB_ROOT}/claimFlags`).once("value").then(snap => {
   claimFlags = snap.val() || {};
-  updateBadgesUI(); // refresh which badge shows
+  updateBadgesUI();
 });
 
 let cloudData = {};
@@ -554,7 +558,7 @@ function listenTodaySchedule(){
     currentScheduleKey = newKey;
     currentScheduleRef = db.ref(`${DB_ROOT}/dailySchedules/` + currentScheduleKey);
 
-    currentScheduleRef.on("value", snap => {
+    currentScheduleRef.once("value").then(snap => {
         todaySchedule = snap.val() || [];
         renderTodaySchedule();
     });
