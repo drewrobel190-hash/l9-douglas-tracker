@@ -3,18 +3,19 @@ console.log("Bosses:", bosses);
 console.log("Loot:", lootData);
 
 const firebaseConfig = {
-  apiKey: "AIzaSyD0-Lmvx-dmxvQcb_b4T3U-D4sdadH9Y3g",
-  authDomain: "l9-boss-tracker.firebaseapp.com",
-  databaseURL: "https://l9-boss-tracker-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "l9-boss-tracker",
-  storageBucket: "l9-boss-tracker.firebasestorage.app",
-  messagingSenderId: "24208974708",
-  appId: "1:24208974708:web:925e95b886b8ead9924221"
+  apiKey: "AIzaSyA0WSRSXereaPtFKOdf9wJYkgq--1vUnr4",
+  authDomain: "l9-boss-tracker-2.firebaseapp.com",
+  databaseURL: "https://l9-boss-tracker-2-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "l9-boss-tracker-2",
+  storageBucket: "l9-boss-tracker-2.firebasestorage.app",
+  messagingSenderId: "321005406944",
+  appId: "1:321005406944:web:64bd052a4b4927bea3de85"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const DB_ROOT = "douglas";
+const APP_VERSION = "1.0.1";
 
 db.ref(`${DB_ROOT}/bossTimers`).on("value", snap => {
     cloudData = snap.val() || {};
