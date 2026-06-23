@@ -1991,6 +1991,25 @@ body::-webkit-scrollbar-thumb:hover{ background:linear-gradient(180deg,var(--cya
 .schedule-entry.sched-past{ opacity:0.4; }
 .schedule-entry.sched-past .schedule-time{ color:var(--text-mute); text-shadow:none; }
 
+/* auto-added 2nd-guild boss spawns (from the live boss timers) */
+.schedule-entry.sched-boss{ border-left-color:var(--green); }
+.schedule-entry.sched-boss .schedule-time{ color:var(--green); text-shadow:0 0 8px rgba(0,255,163,0.4); }
+.sched-tag{
+    display:inline-block;
+    margin-left:8px;
+    padding:1px 7px;
+    font-family:var(--font-mono);
+    font-size:9px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    color:var(--green);
+    background:rgba(0,255,163,0.12);
+    border:1px solid rgba(0,255,163,0.4);
+    border-radius:999px;
+    vertical-align:middle;
+}
+
 /* ===================== MOBILE PERFORMANCE ===================== */
 /* Phones choke on continuous animations + backdrop blur + blend modes.
    Disable the expensive effects under 768px; the neon look stays (just static). */

@@ -752,6 +752,34 @@ Neutro: [
   }
   ],
 
+  "Roderick": [
+    { name: "Pernox Helm",  rarity: "Legendary", type: "Helm",  img: "Boss loots/21.Roderick/Pernox Helm.png",  desc: "", stats: "Defense Power: 540 | Additional Option: 3 Options" },
+    { name: "Pernox Hood",  rarity: "Legendary", type: "Hood",  img: "Boss loots/21.Roderick/Pernox Hood.png",  desc: "", stats: "Defense Power: 510 | Additional Option: 3 Options" },
+    { name: "Pernox Armor", rarity: "Legendary", type: "Armor", img: "Boss loots/21.Roderick/Pernox Armor.png", desc: "", stats: "Defense Power: 760 | Additional Option: 3 Options" },
+    { name: "Pernox Vest",  rarity: "Legendary", type: "Vest",  img: "Boss loots/21.Roderick/Pernox Vest.png",  desc: "", stats: "Defense Power: 720 | Additional Option: 3 Options" }
+  ],
+
+  "Gareth": [
+    { name: "Pernox Knuckles",         rarity: "Legendary", type: "Knuckles",         img: "Boss loots/22.Gareth/Pernox Knuckles.png",         desc: "", stats: "Melee Attack: 322 | Additional Option: 3 Options" },
+    { name: "Pernox Sword and Shield", rarity: "Legendary", type: "Sword and Shield", img: "Boss loots/22.Gareth/Pernox Sword and Shield.png", desc: "", stats: "Melee Attack: 875 | Additional Option: 3 Options" },
+    { name: "Pernox Bow",              rarity: "Legendary", type: "Bow",              img: "Boss loots/22.Gareth/Pernox Bow.png",              desc: "", stats: "Ranged Attack: 875 | Additional Option: 3 Options" },
+    { name: "Pernox Helm",             rarity: "Legendary", type: "Helm",             img: "Boss loots/22.Gareth/Pernox Helm.png",             desc: "", stats: "Defense Power: 540 | Additional Option: 3 Options" }
+  ],
+
+  "Titore": [
+    { name: "Pernox Battle Shield", rarity: "Legendary", type: "Battle Shield", img: "Boss loots/23.Titore/Pernox Battle Shield.png", desc: "", stats: "Melee Attack: 830 | Additional Option: 3 Options" },
+    { name: "Pernox Dual Daggers",  rarity: "Legendary", type: "Dual Daggers",  img: "Boss loots/23.Titore/Pernox Dual Daggers.png",  desc: "", stats: "Melee Attack: 890 | Additional Option: 3 Options" },
+    { name: "Pernox Crossbow",      rarity: "Legendary", type: "Crossbow",      img: "Boss loots/23.Titore/Pernox Crossbow.png",      desc: "", stats: "Ranged Attack: 920 | Additional Option: 3 Options" },
+    { name: "Pernox Helm",          rarity: "Legendary", type: "Helm",          img: "Boss loots/23.Titore/Pernox Helm.png",          desc: "", stats: "Defense Power: 540 | Additional Option: 3 Options" }
+  ],
+
+  "Larba": [
+    { name: "Pernox Battle Staff",  rarity: "Legendary", type: "Battle Staff",  img: "Boss loots/24.Larba/Pernox Battle Staff.png",  desc: "", stats: "Magic Attack: 920 | Additional Option: 3 Options" },
+    { name: "Pernox Battle Shield", rarity: "Legendary", type: "Battle Shield", img: "Boss loots/24.Larba/Pernox Battle Shield.png", desc: "", stats: "Melee Attack: 830 | Additional Option: 3 Options" },
+    { name: "Pernox Staff",         rarity: "Legendary", type: "Staff",         img: "Boss loots/24.Larba/Pernox Staff.png",         desc: "", stats: "Magic Attack: 830 | Additional Option: 3 Options" },
+    { name: "Pernox Dual Daggers",  rarity: "Legendary", type: "Dual Daggers",  img: "Boss loots/24.Larba/Pernox Dual Daggers.png",  desc: "", stats: "Melee Attack: 890 | Additional Option: 3 Options" }
+  ],
+
 };
 
 

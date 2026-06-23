@@ -807,14 +807,41 @@ function formatScheduleTime(timestamp){
 }
 
 function scheduleOffset(){
-    const n = Number(typeof selectedOffset !== "undefined" ? selectedOffset : 8);
-    return isNaN(n) ? 8 : n;     // default Philippines (UTC+8)
+    // Schedule is ALWAYS shown in Philippines time (UTC+8). The sheet is
+    // Thai (UTC+7), so this means +1h — regardless of the boss-timer
+    // timezone dropdown.
+    return 8;
+}
+
+/* 2nd-guild bosses: their live spawn times (set via "Set Timer" / "Dead")
+   are auto-merged into the Today Schedule so the guild never has to edit the
+   sheet. These come from the shared boss timers, so everyone sees them. */
+const GUILD2_BOSSES = ["Venatus", "Viorent", "Ego", "Livera", "Araneo", "Undomiel"];
+
+function getGuildBossEvents(){
+    const out = [];
+    GUILD2_BOSSES.forEach(name => {
+        const saved = cloudData[name];
+        let spawn = null;
+        if(saved && typeof saved === "object") spawn = saved.spawn;
+        else if(typeof saved === "number") spawn = saved;
+        if(!spawn) return;
+        // boss spawn is an absolute UTC timestamp → express it as PH wall clock
+        out.push({ name: name, localMs: spawn + 8 * 3600000, isBoss: true });
+    });
+    return out;
 }
 
 function renderTodaySchedule(){
     if(!scheduleList) return;
 
-    if(!scheduleEvents || scheduleEvents.length === 0){
+    const sheetEvents = (scheduleEvents || []).map(e => ({ name: e.name, localMs: e.localMs, isBoss: false }));
+    const bossEvents = getGuildBossEvents().filter(b =>
+        !sheetEvents.some(s => s.name.toLowerCase().includes(b.name.toLowerCase()))   // skip if sheet already lists it
+    );
+    const all = sheetEvents.concat(bossEvents).sort((a, b) => a.localMs - b.localMs);
+
+    if(all.length === 0){
         scheduleList.innerHTML = `<div class="schedule-empty">No schedule loaded for today or tomorrow.</div>`;
         return;
     }
@@ -830,16 +857,18 @@ function renderTodaySchedule(){
         { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" });
 
     const section = (title, from, to) => {
-        const list = scheduleEvents.filter(e => e.localMs >= from && e.localMs < to);
+        const list = all.filter(e => e.localMs >= from && e.localMs < to);
         if(!list.length){
             return `<div class="sched-group">${title}</div><div class="schedule-empty">Nothing scheduled.</div>`;
         }
         const rows = list.map(e => {
             const past = e.localMs < nowLocal ? " sched-past" : "";
-            return `<div class="schedule-entry${past}">
+            const bossCls = e.isBoss ? " sched-boss" : "";
+            const tag = e.isBoss ? `<span class="sched-tag">2nd Guild</span>` : "";
+            return `<div class="schedule-entry${past}${bossCls}">
                         <div class="schedule-entry-left">
                             <span class="schedule-time">${fmtTime(e.localMs)}</span>
-                            <span class="schedule-text">${attEscape(e.name).replace(/\n+/g, " · ")}</span>
+                            <span class="schedule-text">${attEscape(e.name).replace(/\n+/g, " · ")}${tag}</span>
                         </div>
                     </div>`;
         }).join("");
@@ -1000,7 +1029,7 @@ function createCard(boss){
         Set Timer
     </button>
     <button class="quick-dead-btn"
-            onclick="armDead(this, '${boss.name}', ${boss.hours})"
+            onclick="armDead(event, this, '${boss.name}', ${boss.hours})"
             data-tip="set boss died right now">
         Dead
     </button>
@@ -1063,7 +1092,7 @@ if(lootData[boss.name] && lootData[boss.name].length > 0){
          data-type="${item.type || ''}"
          data-stats="${item.stats || ''}"
          data-location="${item.location || ''}">
-        <img src="${item.img || 'Pictures/placeholder.png'}" alt="${item.name}">
+        <img src="${item.img || 'Pictures/placeholder.png'}" alt="${item.name}" onerror="this.onerror=null;this.src='Pictures/placeholder.png'">
     </div>
 `).join("");
 
@@ -1474,7 +1503,8 @@ function quickSetDead(name, hours){
 /* Two-step confirm for the Dead button (prevents accidental clicks):
    click 1 → button turns green and says "Yes"; click 2 within a few
    seconds → fires quickSetDead and reverts. Auto-cancels if not confirmed. */
-function armDead(btn, name, hours){
+function armDead(e, btn, name, hours){
+    if(e){ e.stopPropagation(); }          // barrier: don't open the loot view
     if(!isAdmin){ alert("Admin only."); return; }
     if(!btn) return;
 
@@ -1967,7 +1997,7 @@ slot.dataset.type = item.type || "";
 slot.dataset.stats = item.stats || "";
 slot.dataset.location = item.location || "";
 
-slot.innerHTML = `<img src="${item.img}" alt="${item.name}">`;
+slot.innerHTML = `<img src="${item.img}" alt="${item.name}" onerror="this.onerror=null;this.src='Pictures/placeholder.png'">`;
 
         slot.onclick = () => {
     openItemPopupFromSlot(slot);
