@@ -1006,6 +1006,54 @@ function deleteScheduleItem(index){
 
 
 
+/* Hover-to-animate boss portraits (PC only — skipped on touch to avoid
+   mobile lag). Add a boss here as: "<BossName>": "<path to .gif>".
+   The GIF is heavy, so it lazy-loads on first hover and crossfades in
+   (handled per-card in attachGifHover). */
+const BOSS_GIFS = {
+    "Venatus":         "Boss GIF/1Venatus.gif",
+    "Viorent":         "Boss GIF/2Viorent.gif",
+    "Ego":             "Boss GIF/3Ego.gif",
+    "Clemantis":       "Boss GIF/4Clemantis.gif",
+    "Livera":          "Boss GIF/5Livera.gif",
+    "Araneo":          "Boss GIF/6Araneo.gif",
+    "Undomiel":        "Boss GIF/7Undomiel.gif",
+    "Saphirus":        "Boss GIF/8Saphirus.gif",
+    "Lady Dalia":      "Boss GIF/9LadyDalia.gif",
+    "General Aquleus": "Boss GIF/10GeneralAquleus.gif"
+};
+
+// true only on devices with a real mouse (desktop/laptop), false on phones/tablets
+const CAN_HOVER_GIF = !!(window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine)").matches);
+
+/* Wire a card's hover crossfade: load the GIF on first hover, then dissolve
+   PNG -> GIF. Only ever called on PC for bosses that have a GIF. */
+function attachGifHover(card){
+    const wrap = card.querySelector(".boss-img-wrap.has-gif");
+    if(!wrap) return;
+    const gif = wrap.querySelector(".boss-gif");
+    if(!gif) return;
+
+    let loaded = false;
+    let hovering = false;
+
+    gif.addEventListener("load", () => {
+        loaded = true;
+        if(hovering) wrap.classList.add("gif-on");   // arrived while still hovering → fade in now
+    });
+
+    wrap.addEventListener("mouseenter", () => {
+        hovering = true;
+        if(!gif.getAttribute("src")) gif.src = gif.dataset.gif;   // lazy-load once
+        if(loaded) wrap.classList.add("gif-on");
+    });
+
+    wrap.addEventListener("mouseleave", () => {
+        hovering = false;
+        wrap.classList.remove("gif-on");             // fade back to the static image
+    });
+}
+
 function createCard(boss){
     const card = document.createElement("div");
     card.className="card";
@@ -1113,9 +1161,17 @@ if(lootData[boss.name] && lootData[boss.name].length > 0){
 
 
 
+    const gifSrc = BOSS_GIFS[boss.name] || "";
+    const showGif = gifSrc && CAN_HOVER_GIF;        // GIF layer only on PC
+    const wrapClass = showGif ? "boss-img-wrap has-gif" : "boss-img-wrap";
+    const bossImgTag = showGif
+        ? `<img class="boss-img" src="${boss.image}">
+       <img class="boss-gif" data-gif="${gifSrc}" alt="" aria-hidden="true">`
+        : `<img class="boss-img" src="${boss.image}">`;
+
     card.innerHTML = `
-      <div class="boss-img-wrap">
-  <img class="boss-img" src="${boss.image}">
+      <div class="${wrapClass}">
+  ${bossImgTag}
   <div class="assist-badge" title="Assist is ON">🤝 Assist</div>
   <div class="claim-badge" title="Our Loot">🎁 Our Loot</div>
 </div>
@@ -1159,6 +1215,8 @@ if(lootData[boss.name] && lootData[boss.name].length > 0){
     </div>
 `;
 
+
+    if(showGif) attachGifHover(card);
 
     document.getElementById("soonGrid").appendChild(card);
 }

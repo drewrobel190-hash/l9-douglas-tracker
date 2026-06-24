@@ -444,6 +444,25 @@ select option{
     filter:saturate(1.15) contrast(1.05);
 }
 
+/* hover crossfade: the animated GIF dissolves over the static portrait (PC only) */
+.boss-gif{
+    position:absolute;
+    top:0;
+    left:0;
+    width:110px;
+    height:150px;
+    object-fit:cover;
+    object-position:center;
+    display:block;
+    filter:saturate(1.15) contrast(1.05);
+    opacity:0;
+    transition:opacity 0.55s ease;
+    pointer-events:none;
+}
+.boss-img-wrap.has-gif .boss-img{ transition:opacity 0.55s ease; }
+.boss-img-wrap.has-gif.gif-on .boss-gif{ opacity:1; }
+.boss-img-wrap.has-gif.gif-on .boss-img{ opacity:0; }
+
 .name{
     font-family:var(--font-display);
     font-weight:700;
