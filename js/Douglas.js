@@ -1011,16 +1011,16 @@ function deleteScheduleItem(index){
    The GIF is heavy, so it lazy-loads on first hover and crossfades in
    (handled per-card in attachGifHover). */
 const BOSS_GIFS = {
-    "Venatus":         "Boss GIF/1Venatus.gif",
-    "Viorent":         "Boss GIF/2Viorent.gif",
-    "Ego":             "Boss GIF/3Ego.gif",
-    "Clemantis":       "Boss GIF/4Clemantis.gif",
-    "Livera":          "Boss GIF/5Livera.gif",
-    "Araneo":          "Boss GIF/6Araneo.gif",
-    "Undomiel":        "Boss GIF/7Undomiel.gif",
-    "Saphirus":        "Boss GIF/8Saphirus.gif",
-    "Lady Dalia":      "Boss GIF/9LadyDalia.gif",
-    "General Aquleus": "Boss GIF/10GeneralAquleus.gif"
+    "Venatus":         "Boss GIF/1Venatus.webp",
+    "Viorent":         "Boss GIF/2Viorent.webp",
+    "Ego":             "Boss GIF/3Ego.webp",
+    "Clemantis":       "Boss GIF/4Clemantis.webp",
+    "Livera":          "Boss GIF/5Livera.webp",
+    "Araneo":          "Boss GIF/6Araneo.webp",
+    "Undomiel":        "Boss GIF/7Undomiel.webp",
+    "Saphirus":        "Boss GIF/8Saphirus.webp",
+    "Lady Dalia":      "Boss GIF/9LadyDalia.webp",
+    "General Aquleus": "Boss GIF/10GeneralAquleus.webp"
 };
 
 // true only on devices with a real mouse (desktop/laptop), false on phones/tablets
