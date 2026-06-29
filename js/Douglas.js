@@ -506,7 +506,7 @@ function restoreAdminSession(){
 const ATTENDANCE_SHEETS = {
     main: {
         id: "1SCYRJPIoxuNd2OfLIeMlrqaqyLECIP2ekLyigZ1BktI",
-        gid: "802709729",
+        gid: "467377759",   // Jun 29 week tab (resets weekly; update each new week)
         nameCol: 0,
         scoreCol: 2,      // "Score"
         label: "Main Guild",
@@ -1062,23 +1062,32 @@ function attachGifHover(card){
     const gif = wrap.querySelector(".boss-gif");
     if(!gif) return;
 
-    let loaded = false;
+    const src = gif.dataset.gif;
     let hovering = false;
+    let clearTimer = null;
 
     gif.addEventListener("load", () => {
-        loaded = true;
         if(hovering) wrap.classList.add("gif-on");   // arrived while still hovering → fade in now
     });
 
     wrap.addEventListener("mouseenter", () => {
         hovering = true;
-        if(!gif.getAttribute("src")) gif.src = gif.dataset.gif;   // lazy-load once
-        if(loaded) wrap.classList.add("gif-on");
+        if(clearTimer){ clearTimeout(clearTimer); clearTimer = null; }
+        if(!gif.getAttribute("src")){
+            gif.src = src;                           // (re)load — instant after the first time (cached)
+        } else if(gif.complete){
+            wrap.classList.add("gif-on");            // already loaded → fade in
+        }
     });
 
     wrap.addEventListener("mouseleave", () => {
         hovering = false;
-        wrap.classList.remove("gif-on");             // fade back to the static image
+        wrap.classList.remove("gif-on");             // crossfade back to the static image
+        // After it fades out, drop the src so the WebP stops decoding frames in the
+        // background. Otherwise every boss you've hovered keeps animating = lag.
+        clearTimer = setTimeout(() => {
+            if(!hovering) gif.removeAttribute("src");
+        }, 700);
     });
 }
 
