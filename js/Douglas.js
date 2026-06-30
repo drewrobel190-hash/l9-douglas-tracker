@@ -886,28 +886,43 @@ const SCHEDULE_SHEET = {
     id: "1ZhK_aO2nLzLcMgrb1jWw3DOctlkR1US_CciHd_E2GZI",
     gid: "921196904",
     nameCol: 1,   // "NAME-EN"
-    timeCol: 3    // "Day Spawn"  e.g. "Tue, 23/06/2026 19:00"
+    dateCol: 0,   // column A — a real datetime, filled even for fixed bosses (where Day Spawn = "None")
+    timeCol: 3    // "Day Spawn" string  e.g. "Tue, 23/06/2026 19:00"  (fallback)
 };
 let scheduleEvents = [];
 
 function parseScheduleSheet(table){
     const rows = (table && table.rows) || [];
-    const shift = (scheduleOffset() - 7) * 3600000;   // sheet is UTC+7 -> local
-    const re = /(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/;
+    const shift = (scheduleOffset() - 7) * 3600000;          // sheet is UTC+7 -> local
+    const reGviz = /Date\((\d+),(\d+),(\d+),(\d+),(\d+)/;     // column A datetime (month 0-indexed)
+    const reStr  = /(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/; // "Day Spawn" string fallback
     const out = [];
 
     rows.forEach(r => {
         const c = r.c || [];
         const nameCell = c[SCHEDULE_SHEET.nameCol];
-        const timeCell = c[SCHEDULE_SHEET.timeCol];
         const name = (nameCell && nameCell.v != null) ? String(nameCell.v).trim() : "";
-        const raw  = (timeCell && timeCell.v != null) ? String(timeCell.v).trim() : "";
-        if(!name || !raw) return;
+        if(!name) return;
 
-        const m = raw.match(re);            // DD/MM/YYYY HH:MM
-        if(!m) return;                      // skips "None" / blank rows
+        let y, mo, d, hh, mi;
 
-        const localMs = Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]) + shift;
+        // Column A is a true datetime, populated even when "Day Spawn" is "None"
+        // (fixed/weekly bosses). Use it first; fall back to the Day Spawn string.
+        const aCell = c[SCHEDULE_SHEET.dateCol];
+        const aRaw  = (aCell && aCell.v != null) ? String(aCell.v) : "";
+        const gm = aRaw.match(reGviz);
+        if(gm){
+            y = +gm[1]; mo = +gm[2]; d = +gm[3]; hh = +gm[4]; mi = +gm[5];   // gviz month already 0-indexed
+        } else {
+            const dCell = c[SCHEDULE_SHEET.timeCol];
+            const dRaw  = (dCell && dCell.v != null) ? String(dCell.v) : "";
+            const sm = dRaw.match(reStr);
+            if(!sm) return;                          // no usable date anywhere → skip
+            y = +sm[3]; mo = +sm[2] - 1; d = +sm[1]; hh = +sm[4]; mi = +sm[5];
+        }
+
+        if(y < 2000) return;                         // guard against time-only cells
+        const localMs = Date.UTC(y, mo, d, hh, mi) + shift;
         out.push({ name, localMs });
     });
 
