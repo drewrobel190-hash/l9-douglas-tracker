@@ -17,51 +17,50 @@ const db = firebase.database();
 const DB_ROOT = "douglas";
 const APP_VERSION = "1.0.1";
 
-async function loadBossData(){
+let cloudData = {};
+let fixedGuildData = {};
+let assistFlags = {};
+let claimFlags = {};
 
-    const bossSnap = await db.ref(`${DB_ROOT}/bossTimers`).once("value");
-    cloudData = bossSnap.val() || {};
+/* Live Firebase listeners — every admin sees timer/guild/assist/loot
+   changes instantly (was a 30s poll). One listener per node; we just
+   re-render the affected UI on each push. */
+db.ref(`${DB_ROOT}/bossTimers`).on("value", snap => {
+    cloudData = snap.val() || {};
+    if(typeof updateTimers === "function") updateTimers();
+    if(typeof sortBosses === "function") sortBosses();
+    if(typeof renderTodaySchedule === "function" &&
+       document.getElementById("schedulePopup")?.classList.contains("active")){
+        renderTodaySchedule();   // 2nd-guild boss spawns merge into the schedule
+    }
+});
 
-    const guildSnap = await db.ref(`${DB_ROOT}/fixedBossGuilds`).once("value");
-    fixedGuildData = guildSnap.val() || {};
+db.ref(`${DB_ROOT}/fixedBossGuilds`).on("value", snap => {
+    fixedGuildData = snap.val() || {};
+    if(typeof updateTimers === "function") updateTimers();
+    if(typeof sortBosses === "function") sortBosses();
+});
 
-    updateTimers();
-    sortBosses();
-}
+db.ref(`${DB_ROOT}/assistFlags`).on("value", snap => {
+    assistFlags = snap.val() || {};
+    if(typeof updateBadgesUI === "function") updateBadgesUI();
 
-loadBossData();
+    // keep the admin modal checkbox in sync if it's open
+    const layerOpen = document.getElementById("adminLayer")?.classList.contains("active");
+    if(layerOpen && typeof currentAdminBoss !== "undefined" && currentAdminBoss){
+        const assistBox = document.getElementById("adminAssist");
+        if(assistBox) assistBox.checked = !!assistFlags[currentAdminBoss] || !!assistFlags[currentAdminBoss.trim()];
+    }
+});
 
-setInterval(loadBossData, 30000);
+db.ref(`${DB_ROOT}/claimFlags`).on("value", snap => {
+    claimFlags = snap.val() || {};
+    if(typeof updateBadgesUI === "function") updateBadgesUI();
+});
 
 window.addEventListener("beforeunload", () => {
     firebase.database().goOffline();
 });
-
-// ===== ASSIST FLAGS (SEPARATE FROM bossTimers) =====
-let assistFlags = {};
-
-db.ref(`${DB_ROOT}/assistFlags`).once("value").then(snap => {
-  assistFlags = snap.val() || {};
-  updateBadgesUI();
-
-  // if admin modal is open, refresh checkbox state too
-  const layerOpen = document.getElementById("adminLayer")?.classList.contains("active");
-  if(layerOpen && currentAdminBoss){
-    const assistBox = document.getElementById("adminAssist");
-    if(assistBox) assistBox.checked = !!assistFlags[currentAdminBoss] || !!assistFlags[currentAdminBoss.trim()];
-  }
-});
-
-// ===== OUR LOOT FLAGS (SEPARATE) =====
-let claimFlags = {};
-
-db.ref(`${DB_ROOT}/claimFlags`).once("value").then(snap => {
-  claimFlags = snap.val() || {};
-  updateBadgesUI();
-});
-
-let cloudData = {};
-let fixedGuildData = {};
 let isTyping = false;
 let isAdmin = false;
 let expandedCard = null;
@@ -1224,8 +1223,8 @@ if(lootData[boss.name] && lootData[boss.name].length > 0){
     card.innerHTML = `
       <div class="${wrapClass}">
   ${bossImgTag}
-  <div class="assist-badge" title="Assist is ON">🤝 Assist</div>
-  <div class="claim-badge" title="Our Loot">🎁 Our Loot</div>
+  <div class="assist-badge" title="Assist Mode Active"><span class="badge-text">ASSIST</span></div>
+  <div class="claim-badge" title="Our Loot — claimed by us"><span class="badge-text">OUR LOOT</span></div>
 </div>
   <div class="card-content">
     ${baseContent}
@@ -2234,12 +2233,14 @@ if(schedulePopup){
 
 openMapBtn.onclick = () => {
     mapOverlay.classList.add("active");
-    document.body.style.overflow = "hidden"; 
+    document.body.classList.add("map-open");      // hides the sticky header
+    document.body.style.overflow = "hidden";
 };
 
 
 function closeMapOverlay(){
     mapOverlay.classList.remove("active");
+    document.body.classList.remove("map-open");
     document.body.style.overflow = "auto";
 }
 

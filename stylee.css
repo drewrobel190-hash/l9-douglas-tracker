@@ -1247,6 +1247,9 @@ body::-webkit-scrollbar-thumb:hover{ background:linear-gradient(180deg,var(--cya
 .close-btn{ cursor:pointer; font-size:20px; color:var(--magenta); }
 
 /* ===================== MAP OVERLAY ===================== */
+/* hide the sticky site header while the map is open (all screen sizes) */
+body.map-open header{ display:none; }
+
 .map-overlay{
     position:fixed;
     inset:0;
@@ -1652,90 +1655,134 @@ body::-webkit-scrollbar-thumb:hover{ background:linear-gradient(180deg,var(--cya
 #historyList::-webkit-scrollbar-thumb{ background:linear-gradient(180deg,var(--amber),#b98d1f); border-radius:10px; }
 #historyList::-webkit-scrollbar-thumb:hover{ background:linear-gradient(180deg,#ffd95c,var(--amber)); }
 
-/* ===================== ASSIST / CLAIM BADGES ===================== */
-.assist-badge{
+/* ===================== ASSIST / OUR LOOT BADGES (cyber HUD) ===================== */
+.assist-badge,
+.claim-badge{
     position:absolute;
-    left:8px;
-    bottom:5px;
+    left:6px;
+    bottom:6px;
     display:none;
     align-items:center;
-    gap:6px;
-    padding:2px 6px;
-    border-radius:999px;
+    padding:4px 11px 4px 11px;
     font-family:var(--font-mono);
-    font-size:9px;
+    font-size:9.5px;
     font-weight:800;
-    color:#bff7d4;
-    background:linear-gradient(145deg,rgba(0,255,163,0.22),rgba(7,5,20,0.7));
-    border:1px solid rgba(0,255,163,0.4);
+    line-height:1;
+    letter-spacing:1.8px;
+    text-transform:uppercase;
     backdrop-filter:blur(8px);
     -webkit-backdrop-filter:blur(8px);
     opacity:0;
     transform:translateY(2px);
     transition:all 0.25s ease;
     z-index:5;
-}
-.assist-badge::before{
-    content:"";
-    width:6px; height:6px;
-    border-radius:50%;
-    background:radial-gradient(circle,#34d399 35%,#059669 70%);
-    box-shadow:0 0 8px rgba(0,255,163,0.8);
-    animation:assistPulse 1.6s ease-in-out infinite;
-}
-.card.assist-on .assist-badge{ display:inline-flex; opacity:1; transform:translateY(0); text-shadow:0 0 10px rgba(0,255,163,0.3); }
-.card.assist-on{ box-shadow:inset 0 0 0 1px rgba(0,255,163,0.25), 0 0 20px rgba(0,255,163,0.12); }
-.card.assist-on:hover .assist-badge{ filter:brightness(1.08); box-shadow:0 10px 26px rgba(0,0,0,0.5), 0 0 26px rgba(0,255,163,0.3); }
-@keyframes assistPulse{
-    0%{ transform:scale(1); opacity:0.75; }
-    50%{ transform:scale(1.35); opacity:1; }
-    100%{ transform:scale(1); opacity:0.75; }
+    overflow:hidden;
+    isolation:isolate;
+    /* chamfered corners (top-left + bottom-right cut) — same look as the buttons/modals */
+    clip-path:polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px);
 }
 
-.claim-badge{
-    position:absolute;
-    left:8px;
-    bottom:5px;
-    display:none;
-    align-items:center;
-    gap:4px;
-    padding:2px 6px;
-    border-radius:999px;
-    font-family:var(--font-mono);
-    font-size:9px;
-    font-weight:800;
-    color:#ffe8a3;
-    background:linear-gradient(145deg,rgba(255,180,0,0.25),rgba(7,5,20,0.7));
-    border:1px solid rgba(255,180,0,0.5);
-    backdrop-filter:blur(8px);
-    -webkit-backdrop-filter:blur(8px);
-    opacity:0;
-    transform:translateY(2px);
-    transition:all 0.25s ease;
-    z-index:6;
-}
+/* HUD edge stripe — replaces the old pulsing dot.
+   Sits flush against the left side and softly breathes. */
+.assist-badge::before,
 .claim-badge::before{
     content:"";
-    width:6px; height:6px;
-    border-radius:50%;
-    background:radial-gradient(circle,#ffd54f 35%,#ffb400 70%);
-    box-shadow:0 0 10px rgba(255,180,0,0.85);
-    animation:claimPulse 1.6s ease-in-out infinite;
-}
-.card.claim-on .claim-badge{ display:inline-flex; opacity:1; transform:translateY(0); }
-.card.claim-on{ box-shadow:inset 0 0 0 1px rgba(255,180,0,0.3), 0 0 22px rgba(255,180,0,0.12); }
-@keyframes claimPulse{
-    0%{ transform:scale(1); opacity:0.75; }
-    50%{ transform:scale(1.35); opacity:1; }
-    100%{ transform:scale(1); opacity:0.75; }
+    position:absolute;
+    top:0;
+    left:0;
+    width:2.5px;
+    height:100%;
+    z-index:3;
+    pointer-events:none;
 }
 
-/* badge exclusivity + hide during loot view */
+/* keep the label crisp above the shimmer */
+.assist-badge .badge-text,
+.claim-badge .badge-text{
+    position:relative;
+    z-index:3;
+}
+
+/* holographic sweep — animated highlight glides across the badge */
+.assist-badge::after,
+.claim-badge::after{
+    content:"";
+    position:absolute;
+    top:0;
+    left:-100%;
+    width:55%;
+    height:100%;
+    pointer-events:none;
+    z-index:2;
+    background:linear-gradient(100deg, transparent 10%, rgba(255,255,255,0.32) 50%, transparent 90%);
+    animation:badgeShimmer 3.2s linear infinite;
+}
+@keyframes badgeShimmer{
+    0%   { left:-100%; }
+    100% { left:200%;  }
+}
+
+/* --- ASSIST (mint/cyber green) --- */
+.assist-badge{
+    color:#bff7d4;
+    background:linear-gradient(135deg, rgba(0,255,163,0.22), rgba(7,5,20,0.85));
+    border:1px solid rgba(0,255,163,0.55);
+    box-shadow:
+        0 0 12px rgba(0,255,163,0.32),
+        inset 0 0 8px rgba(0,255,163,0.10);
+}
+.assist-badge::before{
+    background:linear-gradient(180deg, transparent 0%, #5dffb6 25%, #00ff9c 50%, #5dffb6 75%, transparent 100%);
+    box-shadow:0 0 10px rgba(0,255,163,0.9), 0 0 18px rgba(0,255,163,0.4);
+    animation:edgePulse 1.8s ease-in-out infinite;
+}
+
+/* --- OUR LOOT (gold cyber) --- */
+.claim-badge{
+    color:#ffe8a3;
+    background:linear-gradient(135deg, rgba(255,180,0,0.26), rgba(7,5,20,0.85));
+    border:1px solid rgba(255,193,7,0.6);
+    box-shadow:
+        0 0 14px rgba(255,193,7,0.42),
+        inset 0 0 8px rgba(255,193,7,0.12);
+}
+.claim-badge::before{
+    background:linear-gradient(180deg, transparent 0%, #fff1b3 25%, #ffd54f 50%, #fff1b3 75%, transparent 100%);
+    box-shadow:0 0 10px rgba(255,193,7,0.95), 0 0 18px rgba(255,193,7,0.4);
+    animation:edgePulse 1.8s ease-in-out infinite;
+}
+
+/* visible/animate-in when card is in that state */
+.card.assist-on .assist-badge{
+    display:inline-flex;
+    opacity:1;
+    transform:translateY(0);
+    text-shadow:0 0 8px rgba(0,255,163,0.45);
+}
+.card.claim-on .claim-badge{
+    display:inline-flex;
+    opacity:1;
+    transform:translateY(0);
+    text-shadow:0 0 8px rgba(255,193,7,0.50);
+}
+
+/* card outline glow when armed */
+.card.assist-on{ box-shadow:inset 0 0 0 1px rgba(0,255,163,0.30), 0 0 22px rgba(0,255,163,0.14); }
+.card.claim-on{  box-shadow:inset 0 0 0 1px rgba(255,193,7,0.34), 0 0 22px rgba(255,193,7,0.14); }
+
+.card.assist-on:hover .assist-badge,
+.card.claim-on:hover .claim-badge{ filter:brightness(1.08); }
+
+/* soft breathing for the edge stripe — brightness + opacity, no transform */
+@keyframes edgePulse{
+    0%,100% { opacity:0.70; filter:brightness(1); }
+    50%     { opacity:1;    filter:brightness(1.35); }
+}
+
+/* exclusivity + hide during loot view */
 .card.show-details .assist-badge,
 .card.show-details .claim-badge{ display:none !important; }
-.card.claim-on .claim-badge{ display:inline-flex; }
 .card.claim-on .assist-badge{ display:none !important; }
-.card.assist-on .assist-badge{ display:inline-flex; }
 .card.assist-on .claim-badge{ display:none !important; }
 
 /* ===================== ADMIN AUTH MODALS ===================== */
@@ -2065,6 +2112,8 @@ body::-webkit-scrollbar-thumb:hover{ background:linear-gradient(180deg,var(--cya
     .timer{ animation:none; }
     .site-title{ animation:none; }
     .continent-tab.active::after{ animation:none; }
+    .assist-badge::after,
+    .claim-badge::after{ animation:none; display:none; }   /* kill holo shimmer on phones */
 
     /* avoid sticky :hover transform/glow after a tap */
     .card{ transition:none; }
