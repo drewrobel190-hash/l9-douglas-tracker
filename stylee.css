@@ -51,13 +51,11 @@ body{
     color:var(--text);
     letter-spacing:0.3px;
 
-    background:
-        radial-gradient(circle at 18% -10%, rgba(123,59,255,0.18), transparent 45%),
-        radial-gradient(circle at 90% 0%, rgba(255,43,214,0.12), transparent 40%),
-        linear-gradient(-45deg,#04030a,#070514,#0b0820,#05030f);
-    background-size:100% 100%,100% 100%,300% 300%;
-    background-attachment:fixed;
-    animation:darkFlow 18s ease infinite;
+    /* solid dark base — the animated color/grid layers live in body::before,
+       which is position:fixed so it doesn't cost anything on scroll.
+       Removing background-attachment:fixed + the darkFlow animation here
+       eliminates the biggest scroll/repaint cost the site was paying. */
+    background:var(--bg-0);
 }
 
 /* perspective grid + scanline haze, fixed behind everything */
@@ -80,7 +78,9 @@ body::before{
         44px 44px,
         44px 44px,
         100% 3px;
-    animation:gridDrift 22s linear infinite;
+    /* gridDrift removed — animating background-position on 5 layers was
+       one of the top per-frame paint costs on the page. The static grid
+       looks nearly identical (the drift was very subtle). */
 }
 
 /* a single neon line sweeping down the viewport */
@@ -93,10 +93,11 @@ body::after{
     height:140px;
     pointer-events:none;
     z-index:99998;
-    background:linear-gradient(180deg, transparent, rgba(0,240,255,0.06) 60%, rgba(0,240,255,0.14) 88%, transparent);
-    mix-blend-mode:screen;
+    /* Drop mix-blend-mode:screen — it forces every frame to composite the
+       whole viewport. Same visual weight via plain opacity. */
+    background:linear-gradient(180deg, transparent, rgba(0,240,255,0.05) 60%, rgba(0,240,255,0.09) 88%, transparent);
     animation:scanSweep 7s linear infinite;
-    opacity:0.7;
+    opacity:0.55;
 }
 
 @keyframes darkFlow{
@@ -174,8 +175,9 @@ header{
     top:0;
     z-index:9999;
 
-    background:linear-gradient(180deg, rgba(7,5,20,0.92), rgba(7,5,20,0.66));
-    backdrop-filter:blur(10px);
+    /* opaque header — no backdrop-filter blur, which is by far the
+       most expensive thing a sticky element can do (re-blurs on every scroll). */
+    background:linear-gradient(180deg, rgba(7,5,20,0.98), rgba(7,5,20,0.94));
     border-bottom:1px solid var(--line-strong);
     box-shadow:0 6px 30px rgba(0,0,0,0.6), 0 1px 0 rgba(255,43,214,0.25);
 }
@@ -392,10 +394,14 @@ select option{
     box-shadow:0 0 10px rgba(255,43,214,0.7);
 }
 
-/* "Today" cards burn red-hot */
+/* "Today" cards burn red-hot — static peak glow (animating box-shadow every
+   frame on multiple cards was one of the heaviest paint costs). */
 #todayGrid .card{
     border-left:3px solid var(--red);
-    animation:softGlow 3.5s ease-in-out infinite alternate;
+    box-shadow:
+        inset 0 0 0 1px rgba(255,46,94,0.35),
+        0 10px 30px rgba(0,0,0,0.55),
+        0 0 22px rgba(255,46,94,0.4);
 }
 #todayGrid .card::before{ border-color:var(--red); }
 @keyframes softGlow{
@@ -483,7 +489,8 @@ select option{
     display:inline-block;
     position:relative;
     text-shadow:0 0 8px rgba(0,240,255,0.55), 0 0 16px rgba(0,240,255,0.25);
-    animation:timerPulse 2.6s ease-in-out infinite;
+    /* removed timerPulse — 40+ elements pulsing at once was needless paint,
+       and the second-by-second countdown already provides visible motion. */
 }
 @keyframes timerPulse{
     0%,100%{ opacity:0.9; }
@@ -1573,9 +1580,55 @@ body.map-open header{ display:none; }
     box-shadow:0 0 50px rgba(0,0,0,0.7), 0 0 40px rgba(0,240,255,0.1);
 }
 .schedule-admin-box{ margin:18px 0 16px; }
-.schedule-input-row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-.schedule-input-row input[type="time"]{ min-width:130px; }
-.schedule-input-row input[type="text"]{ flex:1; min-width:220px; }
+.schedule-input-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.schedule-input-row input[type="time"]{ min-width:110px; flex:0 0 110px; }
+.schedule-input-row input[type="text"]{ flex:1 1 160px; min-width:0; }
+
+/* toggle chips for the "Tomorrow" and "2nd Guild" checkboxes */
+.sched-opt{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    padding:5px 8px;
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:0.6px;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    background:rgba(0,240,255,0.04);
+    border:1px solid var(--line);
+    border-radius:6px;
+    cursor:pointer;
+    user-select:none;
+    transition:all 0.2s ease;
+    white-space:nowrap;
+}
+.sched-opt input[type="checkbox"]{
+    margin:0;
+    accent-color:var(--cyan);
+    cursor:pointer;
+}
+.sched-opt:hover{
+    color:var(--text);
+    border-color:var(--line-strong);
+    background:rgba(0,240,255,0.09);
+}
+.sched-opt:has(input:checked){
+    color:var(--cyan);
+    border-color:var(--cyan);
+    background:rgba(0,240,255,0.14);
+    box-shadow:0 0 10px rgba(0,240,255,0.28), inset 0 0 6px rgba(0,240,255,0.10);
+    text-shadow:0 0 6px rgba(0,240,255,0.45);
+}
+.sched-opt-2nd input[type="checkbox"]{ accent-color:var(--green); }
+.sched-opt-2nd:has(input:checked){
+    color:var(--green);
+    border-color:var(--green);
+    background:rgba(0,255,163,0.14);
+    box-shadow:0 0 10px rgba(0,255,163,0.30), inset 0 0 6px rgba(0,255,163,0.10);
+    text-shadow:0 0 6px rgba(0,255,163,0.45);
+}
 .schedule-list{
     margin-top:18px;
     display:flex;

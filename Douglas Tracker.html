@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="stylee.css?v=21">
+<link rel="stylesheet" href="stylee.css?v=24">
 
 
 </head>
@@ -246,8 +246,10 @@
     <div id="scheduleAdminBox" class="schedule-admin-box">
       <div class="schedule-input-row">
         <input type="time" id="scheduleTime">
-        <input type="text" id="scheduleText" placeholder="Enter today event...">
-        <button id="addScheduleBtn" class="admin-action">Add Event</button>
+        <input type="text" id="scheduleText" placeholder="Event name…">
+        <label class="sched-opt"><input type="checkbox" id="scheduleTomorrow"><span>Tomorrow</span></label>
+        <label class="sched-opt sched-opt-2nd"><input type="checkbox" id="schedule2nd"><span>2nd Guild</span></label>
+        <button id="addScheduleBtn" class="admin-action">Add</button>
       </div>
     </div>
 
@@ -349,7 +351,7 @@
 <script src="js/bosses.js?v=2"></script>
 <script src="js/lootdata.js?v=11"></script>
 <script src="js/continents.js?v=2"></script>
-<script src="js/Douglas.js?v=20"></script>
+<script src="js/Douglas.js?v=24"></script>
 </body>
 </html>
 
