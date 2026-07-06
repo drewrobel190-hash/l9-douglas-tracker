@@ -510,7 +510,7 @@ function restoreAdminSession(){
 const ATTENDANCE_SHEETS = {
     main: {
         id: "1SCYRJPIoxuNd2OfLIeMlrqaqyLECIP2ekLyigZ1BktI",
-        gid: "467377759",   // Jun 29 week tab (resets weekly; update each new week)
+        gid: "745162862",   // current week tab (resets weekly; update each new week)
         nameCol: 0,
         scoreCol: 2,      // "Score"
         label: "Main Guild",
@@ -518,7 +518,7 @@ const ATTENDANCE_SHEETS = {
     },
     second: {
         id: "1JV3HBq2OX4OXYWDxRLxSwUPibQLPQywBjIK8dD4uN7U",
-        gid: "692409644",
+        gid: "897741575",   // current 2-week period tab (update each new period)
         nameCol: 0,
         scoreCol: 2,      // "Attendance"
         label: "2nd Guild",
