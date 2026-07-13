@@ -364,31 +364,74 @@ timezoneSelect.addEventListener("change", function(){
 
 
 
+/* ============================================================
+   ADMIN AUTH — centered modal login + confirmed logout.
+   Session persists in localStorage so a refresh keeps you
+   logged in until you explicitly log out.
+   ============================================================ */
+
+const ADMIN_STORAGE_KEY = "douglasAdminUser";
+
+/* Entry point from the Admin button.
+   Logged in  -> ask before logging out (no accidental logout).
+   Logged out -> open the login modal. */
 function adminLogin(){
-
-    const btn = document.querySelector(".admin-btn");
-
-    // Logout
     if(isAdmin){
-        isAdmin = false;
-        currentAdminUser = null;
-        btn.classList.remove("active-admin");
-        alert("Admin logged out");
-        applyAdminMode();
+        openAdminLogout();
+    } else {
+        openAdminLogin();
+    }
+}
+
+function openAdminLogin(){
+    const popup = document.getElementById("adminLoginPopup");
+    if(!popup) return;
+
+    const u = document.getElementById("loginUsername");
+    const p = document.getElementById("loginPassword");
+    const err = document.getElementById("loginError");
+
+    if(u) u.value = "";
+    if(p) p.value = "";
+    if(err){ err.textContent = ""; err.classList.remove("show"); }
+
+    popup.classList.add("active");
+    setTimeout(() => { if(u) u.focus(); }, 60);
+}
+
+function closeAdminLogin(){
+    const popup = document.getElementById("adminLoginPopup");
+    if(popup) popup.classList.remove("active");
+}
+
+function submitAdminLogin(){
+    const u = document.getElementById("loginUsername");
+    const p = document.getElementById("loginPassword");
+    const err = document.getElementById("loginError");
+    const submitBtn = document.getElementById("loginSubmitBtn");
+
+    const username = (u ? u.value : "").trim();
+    const password = p ? p.value : "";
+
+    const showErr = (msg) => {
+        if(err){ err.textContent = msg; err.classList.add("show"); }
+    };
+    const resetBtn = () => {
+        if(submitBtn){ submitBtn.disabled = false; submitBtn.textContent = "Login"; }
+    };
+
+    if(!username || !password){
+        showErr("Enter a username and password.");
         return;
     }
 
-    const username = prompt("Enter Username:");
-    if(!username) return;
+    if(submitBtn){ submitBtn.disabled = true; submitBtn.textContent = "Verifying…"; }
 
-    const password = prompt("Enter Password:");
-    if(!password) return;
-
-    // Firebase check instead of local array
     db.ref(`${DB_ROOT}/admins/` + username).once("value").then(snapshot => {
 
         if(!snapshot.exists()){
-            alert("Invalid username");
+            resetBtn();
+            showErr("Invalid username.");
             return;
         }
 
@@ -397,15 +440,268 @@ function adminLogin(){
         if(data.password === password){
             isAdmin = true;
             currentAdminUser = username;
-            btn.classList.add("active-admin");
-            alert("Welcome " + username);
+            localStorage.setItem(ADMIN_STORAGE_KEY, username); // stay logged in across refresh
+
+            const btn = document.querySelector(".admin-btn");
+            if(btn) btn.classList.add("active-admin");
+
+            resetBtn();
+            closeAdminLogin();
             applyAdminMode();
         } else {
-            alert("Wrong password");
+            resetBtn();
+            showErr("Wrong password.");
         }
 
+    }).catch(() => {
+        resetBtn();
+        showErr("Connection error. Try again.");
+    });
+}
+
+function openAdminLogout(){
+    const popup = document.getElementById("adminLogoutPopup");
+    if(popup) popup.classList.add("active");
+}
+
+function closeAdminLogout(){
+    const popup = document.getElementById("adminLogoutPopup");
+    if(popup) popup.classList.remove("active");
+}
+
+function confirmAdminLogout(){
+    isAdmin = false;
+    currentAdminUser = null;
+    localStorage.removeItem(ADMIN_STORAGE_KEY);
+
+    const btn = document.querySelector(".admin-btn");
+    if(btn) btn.classList.remove("active-admin");
+
+    closeAdminLogout();
+    applyAdminMode();
+}
+
+/* Restore a saved admin session on page load (called before applyAdminMode). */
+function restoreAdminSession(){
+    const savedUser = localStorage.getItem(ADMIN_STORAGE_KEY);
+    if(savedUser){
+        isAdmin = true;
+        currentAdminUser = savedUser;
+        const btn = document.querySelector(".admin-btn");
+        if(btn) btn.classList.add("active-admin");
+    }
+}
+
+
+/* ============================================================
+   TOP ATTENDANCE — reads the guild Google Sheets live and
+   ranks members high -> low.
+     • Main guild: 1-week period
+     • 2nd guild:  2-week period
+   Both reset Sunday 24:00 UTC+7 (= Monday 00:00 UTC+7).
+   Sheets are read via the public gviz endpoint using a JSONP
+   <script> tag, which sidesteps cross-origin (CORS) limits.
+   ============================================================ */
+
+const ATTENDANCE_SHEETS = {
+    main: {
+        id: "1SCYRJPIoxuNd2OfLIeMlrqaqyLECIP2ekLyigZ1BktI",
+        gid: "802709729",
+        nameCol: 0,
+        scoreCol: 2,      // "Score"
+        label: "Main Guild",
+        cadence: "weekly"
+    },
+    second: {
+        id: "1JV3HBq2OX4OXYWDxRLxSwUPibQLPQywBjIK8dD4uN7U",
+        gid: "692409644",
+        nameCol: 0,
+        scoreCol: 2,      // "Attendance"
+        label: "2nd Guild",
+        cadence: "biweekly"
+    }
+};
+
+let attendanceTab = "main";
+let attendanceCache = {};      // guild -> sorted rows (cleared each open)
+let attendanceTimer = null;
+
+function attEscape(s){
+    return String(s).replace(/[&<>"']/g, c => (
+        { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]
+    ));
+}
+
+/* Load a public sheet tab as gviz JSON via JSONP (no CORS issues). */
+function gvizLoad(id, gid){
+    return new Promise((resolve, reject) => {
+        const cb = "gviz_" + Math.random().toString(36).slice(2);
+        const script = document.createElement("script");
+        let settled = false;
+
+        const cleanup = () => {
+            try { delete window[cb]; } catch(e){ window[cb] = undefined; }
+            if(script.parentNode) script.parentNode.removeChild(script);
+        };
+
+        window[cb] = (resp) => {
+            settled = true;
+            cleanup();
+            if(resp && resp.table) resolve(resp.table);
+            else reject(new Error("Empty response"));
+        };
+        script.onerror = () => { if(!settled){ cleanup(); reject(new Error("Could not reach the sheet")); } };
+        setTimeout(() => { if(!settled){ cleanup(); reject(new Error("Timed out")); } }, 12000);
+
+        script.src = "https://docs.google.com/spreadsheets/d/" + id +
+                     "/gviz/tq?gid=" + gid + "&headers=1&tqx=out:json;responseHandler:" + cb;
+        document.head.appendChild(script);
+    });
+}
+
+function parseAttendance(table, nameCol, scoreCol){
+    const rows = (table && table.rows) || [];
+    const out = [];
+
+    rows.forEach(r => {
+        const cells = r.c || [];
+        const nameCell = cells[nameCol];
+        const scoreCell = cells[scoreCol];
+
+        const name = (nameCell && nameCell.v != null) ? String(nameCell.v).trim() : "";
+        if(!name) return;
+        if(/^(name|names|total|totals|guild boss)$/i.test(name)) return;  // skip header/aggregate rows
+
+        let score = (scoreCell && scoreCell.v != null) ? Number(scoreCell.v) : 0;
+        if(isNaN(score)) score = 0;
+
+        out.push({ name, score });
     });
 
+    out.sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+    return out;
+}
+
+/* Current period range + the next reset instant for a cadence.
+   Anchored to Mon 2026-06-22 00:00 UTC+7 (a known period start). */
+function attPeriodInfo(cadence){
+    const MS = 86400000;
+    const OFFSET = 7 * 3600000;                 // UTC+7
+    const now = new Date();
+    const now7 = now.getTime() + OFFSET;        // wall-clock ms in UTC+7 (expressed as UTC)
+    const anchor7 = Date.UTC(2026, 5, 22, 0, 0, 0);
+    const lenMs = (cadence === "biweekly" ? 14 : 7) * MS;
+
+    const k = Math.floor((now7 - anchor7) / lenMs);
+    const startMs = anchor7 + k * lenMs;        // period start (UTC+7 wall clock)
+    const endMs = startMs + lenMs;              // reset moment (UTC+7 wall clock)
+    const lastDayMs = endMs - MS;               // last day shown (the Sunday)
+
+    const fmt = (ms) => new Date(ms).toLocaleDateString("en-US",
+        { month: "short", day: "numeric", timeZone: "UTC" });
+
+    return {
+        label: fmt(startMs) + " – " + fmt(lastDayMs),
+        resetMs: endMs - OFFSET                 // back to a real UTC instant
+    };
+}
+
+function attResetCountdown(resetMs){
+    let diff = Math.max(0, resetMs - Date.now());
+    const d = Math.floor(diff / 86400000); diff -= d * 86400000;
+    const h = Math.floor(diff / 3600000);   diff -= h * 3600000;
+    const m = Math.floor(diff / 60000);
+    if(d > 0) return d + "d " + h + "h";
+    if(h > 0) return h + "h " + m + "m";
+    return m + "m";
+}
+
+function openAttendance(){
+    const popup = document.getElementById("attendancePopup");
+    if(!popup) return;
+    attendanceCache = {};                      // always pull fresh data on open
+    popup.classList.add("active");
+    document.body.style.overflow = "hidden";
+    switchAttendance(attendanceTab || "main");
+
+    clearInterval(attendanceTimer);
+    attendanceTimer = setInterval(updateAttendanceMeta, 30000);
+}
+
+function closeAttendance(){
+    const popup = document.getElementById("attendancePopup");
+    if(popup) popup.classList.remove("active");
+    document.body.style.overflow = "auto";
+    clearInterval(attendanceTimer);
+    attendanceTimer = null;
+}
+
+function switchAttendance(guild){
+    attendanceTab = guild;
+
+    document.querySelectorAll(".att-tab").forEach(t => {
+        t.classList.toggle("active", t.dataset.guild === guild);
+    });
+
+    updateAttendanceMeta();
+
+    const listEl = document.getElementById("attendanceList");
+    if(!listEl) return;
+
+    if(attendanceCache[guild]){
+        renderAttendance(attendanceCache[guild]);
+        return;
+    }
+
+    listEl.innerHTML = '<div class="att-state"><div class="att-spin"></div><div>Loading sheet…</div></div>';
+
+    const cfg = ATTENDANCE_SHEETS[guild];
+    gvizLoad(cfg.id, cfg.gid)
+        .then(table => {
+            const data = parseAttendance(table, cfg.nameCol, cfg.scoreCol);
+            attendanceCache[guild] = data;
+            if(attendanceTab === guild) renderAttendance(data);
+        })
+        .catch(err => {
+            if(attendanceTab !== guild) return;
+            listEl.innerHTML =
+                '<div class="att-state err">Couldn\'t load the sheet (' + attEscape(err.message) + ').<br>' +
+                'Make sure it\'s shared as “Anyone with the link · Viewer”.</div>';
+        });
+}
+
+function updateAttendanceMeta(){
+    const cfg = ATTENDANCE_SHEETS[attendanceTab];
+    if(!cfg) return;
+    const info = attPeriodInfo(cfg.cadence);
+    const cadenceLabel = cfg.cadence === "biweekly" ? "2-week" : "weekly";
+
+    const periodEl = document.getElementById("attPeriod");
+    const resetEl = document.getElementById("attReset");
+    if(periodEl) periodEl.innerHTML = cadenceLabel + " · <b>" + info.label + "</b>";
+    if(resetEl) resetEl.innerHTML = "resets in <b>" + attResetCountdown(info.resetMs) + "</b>";
+}
+
+function renderAttendance(data){
+    const listEl = document.getElementById("attendanceList");
+    if(!listEl) return;
+
+    if(!data.length){
+        listEl.innerHTML = '<div class="att-state">No attendance recorded yet for this period.</div>';
+        return;
+    }
+
+    listEl.innerHTML = data.map((p, i) => {
+        const rank = i + 1;
+        const medal = rank === 1 ? "att-top att-gold"
+                    : rank === 2 ? "att-top att-silver"
+                    : rank === 3 ? "att-top att-bronze" : "";
+        return '<div class="att-row ' + medal + '">' +
+                   '<span class="att-rank">' + rank + '</span>' +
+                   '<span class="att-name">' + attEscape(p.name) + '</span>' +
+                   '<span class="att-score">' + p.score + '</span>' +
+               '</div>';
+    }).join("");
 }
 
 
@@ -510,75 +806,119 @@ function formatScheduleTime(timestamp){
     });
 }
 
+function scheduleOffset(){
+    // Schedule is ALWAYS shown in Philippines time (UTC+8). The sheet is
+    // Thai (UTC+7), so this means +1h — regardless of the boss-timer
+    // timezone dropdown.
+    return 8;
+}
+
 function renderTodaySchedule(){
     if(!scheduleList) return;
 
-    scheduleList.innerHTML = "";
-
-    if(!todaySchedule || todaySchedule.length === 0){
-        scheduleList.innerHTML = `<div class="schedule-empty">No events for today yet.</div>`;
+    if(!scheduleEvents || scheduleEvents.length === 0){
+        scheduleList.innerHTML = `<div class="schedule-empty">No schedule loaded for today or tomorrow.</div>`;
         return;
     }
 
-    const now = Date.now();
+    const off = scheduleOffset();
+    const nowLocal = Date.now() + off * 3600000;          // local wall clock (UTC-expressed)
+    const n = new Date(nowLocal);
+    const todayMid = Date.UTC(n.getUTCFullYear(), n.getUTCMonth(), n.getUTCDate());
+    const tomorrowMid = todayMid + 86400000;
+    const dayAfterMid = todayMid + 2 * 86400000;
 
-    const validEvents = todaySchedule
-        .map((item, originalIndex) => ({ item, originalIndex }))
-        .filter(entry => (entry.item.timestamp || 0) > now);
+    const fmtTime = (ms) => new Date(ms).toLocaleTimeString("en-US",
+        { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" });
 
-    if(validEvents.length === 0){
-        scheduleList.innerHTML = `<div class="schedule-empty">No upcoming events.</div>`;
-        return;
-    }
+    const section = (title, from, to) => {
+        const list = scheduleEvents.filter(e => e.localMs >= from && e.localMs < to);
+        if(!list.length){
+            return `<div class="sched-group">${title}</div><div class="schedule-empty">Nothing scheduled.</div>`;
+        }
+        const rows = list.map(e => {
+            const past = e.localMs < nowLocal ? " sched-past" : "";
+            return `<div class="schedule-entry${past}">
+                        <div class="schedule-entry-left">
+                            <span class="schedule-time">${fmtTime(e.localMs)}</span>
+                            <span class="schedule-text">${attEscape(e.name).replace(/\n+/g, " · ")}</span>
+                        </div>
+                    </div>`;
+        }).join("");
+        return `<div class="sched-group">${title}</div>${rows}`;
+    };
 
-    validEvents.forEach(({ item, originalIndex }) => {
-        const row = document.createElement("div");
-        row.className = "schedule-entry";
-
-        row.innerHTML = `
-            <div class="schedule-entry-left">
-                <span class="schedule-time">${formatScheduleTime(item.timestamp)}</span>
-                <span class="schedule-text">${item.text || ""}</span>
-            </div>
-            ${isAdmin ? `<button class="schedule-delete" onclick="deleteScheduleItem(${originalIndex})">Delete</button>` : ""}
-        `;
-
-        scheduleList.appendChild(row);
-    });
+    scheduleList.innerHTML = section("Today", todayMid, tomorrowMid) +
+                             section("Tomorrow", tomorrowMid, dayAfterMid);
 }
 
-function listenTodaySchedule(){
-    const newKey = getTodayScheduleKey();
+/* ---- Today Schedule is now read from the public spawn sheet ----
+   Sheet times are Thai (UTC+7); they are shifted to the selected
+   timezone (Philippines = +1h). Shows Today + Tomorrow. ---- */
+const SCHEDULE_SHEET = {
+    id: "1ZhK_aO2nLzLcMgrb1jWw3DOctlkR1US_CciHd_E2GZI",
+    gid: "921196904",
+    nameCol: 1,   // "NAME-EN"
+    timeCol: 3    // "Day Spawn"  e.g. "Tue, 23/06/2026 19:00"
+};
+let scheduleEvents = [];
 
-    // do nothing if same day still
-    if(currentScheduleKey === newKey && currentScheduleRef){
-        return;
-    }
+function parseScheduleSheet(table){
+    const rows = (table && table.rows) || [];
+    const shift = (scheduleOffset() - 7) * 3600000;   // sheet is UTC+7 -> local
+    const re = /(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/;
+    const out = [];
 
-    // remove old listener first
-    if(currentScheduleRef){
-        currentScheduleRef.off();
-    }
+    rows.forEach(r => {
+        const c = r.c || [];
+        const nameCell = c[SCHEDULE_SHEET.nameCol];
+        const timeCell = c[SCHEDULE_SHEET.timeCol];
+        const name = (nameCell && nameCell.v != null) ? String(nameCell.v).trim() : "";
+        const raw  = (timeCell && timeCell.v != null) ? String(timeCell.v).trim() : "";
+        if(!name || !raw) return;
 
-    currentScheduleKey = newKey;
-    currentScheduleRef = db.ref(`${DB_ROOT}/dailySchedules/` + currentScheduleKey);
+        const m = raw.match(re);            // DD/MM/YYYY HH:MM
+        if(!m) return;                      // skips "None" / blank rows
 
-    currentScheduleRef.once("value").then(snap => {
-        todaySchedule = snap.val() || [];
-        renderTodaySchedule();
+        const localMs = Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]) + shift;
+        out.push({ name, localMs });
     });
+
+    out.sort((a, b) => a.localMs - b.localMs);
+    return out;
 }
+
+function loadSheetSchedule(){
+    if(!scheduleList) return;
+    scheduleList.innerHTML =
+        '<div class="att-state"><div class="att-spin"></div><div>Loading schedule…</div></div>';
+
+    gvizLoad(SCHEDULE_SHEET.id, SCHEDULE_SHEET.gid)
+        .then(table => {
+            scheduleEvents = parseScheduleSheet(table);
+            renderTodaySchedule();
+        })
+        .catch(err => {
+            scheduleList.innerHTML =
+                '<div class="att-state err">Couldn\'t load the schedule sheet (' + attEscape(err.message) + ').<br>' +
+                'Make sure it\'s shared as “Anyone with the link · Viewer”.</div>';
+        });
+}
+
+/* Firebase daily schedule is no longer used to drive the popup. */
+function listenTodaySchedule(){ /* sheet-driven now */ }
 function openSchedulePopup(){
     if(schedulePopup){
         schedulePopup.classList.add("active");
         document.body.style.overflow = "hidden";
     }
 
+    // schedule is sheet-driven now — hide the manual add box
     if(scheduleAdminBox){
-        scheduleAdminBox.style.display = isAdmin ? "block" : "none";
+        scheduleAdminBox.style.display = "none";
     }
 
-    renderTodaySchedule();
+    loadSheetSchedule();
 }
 
 function closeSchedulePopup(){
@@ -660,6 +1000,11 @@ function createCard(boss){
     <button class="open-admin"
             onclick="openAdminLayer('${boss.name}', ${boss.hours})">
         Set Timer
+    </button>
+    <button class="quick-dead-btn"
+            onclick="armDead(event, this, '${boss.name}', ${boss.hours})"
+            data-tip="set boss died right now">
+        Dead
     </button>
 </div>
 </div>
@@ -1099,6 +1444,66 @@ function triggerTimerAnimation(bossName){
     });
 }
 
+/* One-click "just died now": set an interval boss's timer from the current
+   moment, keep its guild, log history, and refresh the card immediately. */
+function quickSetDead(name, hours){
+    if(!isAdmin){ alert("Admin only."); return; }
+    if(!name || hours == null){ return; }
+
+    const death = Date.now();
+    const spawn = death + (hours * 3600000);
+
+    // keep any existing guild on the boss
+    const existing = cloudData[name];
+    const guild = (existing && typeof existing === "object" && existing.guild) ? existing.guild : "";
+
+    db.ref(`${DB_ROOT}/bossTimers/` + name).set({ spawn: spawn, guild: guild });
+
+    db.ref(`${DB_ROOT}/bossHistory`).push({
+        boss: name,
+        deathTime: death,
+        recordedAt: Date.now(),
+        setBy: currentAdminUser || "Unknown"
+    }).then(() => { limitBossHistory(); });
+
+    // optimistic local update so the card updates instantly (don't wait for the 30s poll)
+    cloudData[name] = { spawn: spawn, guild: guild };
+    updateTimers();
+    sortBosses();
+    triggerTimerAnimation(name);
+}
+
+/* Two-step confirm for the Dead button (prevents accidental clicks):
+   click 1 → button turns green and says "Yes"; click 2 within a few
+   seconds → fires quickSetDead and reverts. Auto-cancels if not confirmed. */
+function armDead(e, btn, name, hours){
+    if(e){ e.stopPropagation(); }          // barrier: don't open the loot view
+    if(!isAdmin){ alert("Admin only."); return; }
+    if(!btn) return;
+
+    const disarm = () => {
+        clearTimeout(btn._armTimer);
+        btn.classList.remove("armed");
+        btn.textContent = "Dead";
+        btn.setAttribute("data-tip", "set boss died right now");
+    };
+
+    // second click while armed → confirm + run
+    if(btn.classList.contains("armed")){
+        disarm();
+        quickSetDead(name, hours);
+        return;
+    }
+
+    // first click → arm (green "Yes")
+    btn.classList.add("armed");
+    btn.textContent = "Yes";
+    btn.setAttribute("data-tip", "click again to confirm");
+
+    clearTimeout(btn._armTimer);
+    btn._armTimer = setTimeout(disarm, 3000);
+}
+
 let currentAdminBoss = null;
 let currentAdminHours = null;
 
@@ -1424,18 +1829,22 @@ document.addEventListener("click", function(e){
     return;
 }
 
+    if(e.target.closest(".quick-dead-btn")){
+    return;
+    }
+
     const clickedCard = e.target.closest(".card");
 
     document.querySelectorAll(".card").forEach(card => {
 
         if(card !== clickedCard){
             card.classList.remove("show-details");
-            resetCardState(card);   // THIS IS THE MAGIC BY VS CODE AI DAMN
+            resetCardState(card);   
         }
 
     });
 
-    if(clickedCard && !e.target.closest(".open-admin")){
+    if(clickedCard && !e.target.closest(".open-admin") && !e.target.closest(".quick-dead-btn")){
     clickedCard.classList.toggle("show-details");
 }
 });
@@ -1452,12 +1861,25 @@ document.addEventListener("click", function(e){
 });
 
 
+restoreAdminSession();
 applyAdminMode();
 
 function applyAdminMode(){
   document.querySelectorAll(".admin-controls").forEach(control=>{
     control.style.display = isAdmin ? "block" : "none";
   });
+
+  // show the logged-in admin name under the site title
+  const nameTag = document.getElementById("adminNameTag");
+  if(nameTag){
+    if(isAdmin && currentAdminUser){
+      nameTag.textContent = "◈ " + currentAdminUser;
+      nameTag.style.display = "inline-flex";
+    } else {
+      nameTag.textContent = "";
+      nameTag.style.display = "none";
+    }
+  }
 
   const historyBtn = document.getElementById("historyBtn");
   if(historyBtn) historyBtn.style.display = "inline-block";
@@ -1599,6 +2021,25 @@ document.addEventListener("keydown", function(e){
         if(schedulePopup.classList.contains("active")){
             schedulePopup.classList.remove("active");
             document.body.style.overflow = "auto";
+        }
+
+        // Close Top Attendance
+        const attPopup = document.getElementById("attendancePopup");
+        if(attPopup && attPopup.classList.contains("active")){
+            closeAttendance();
+        }
+
+        // Close admin auth modals
+        closeAdminLogin();
+        closeAdminLogout();
+    }
+
+    // Enter submits the admin login while it is open
+    if(e.key === "Enter"){
+        const loginPopup = document.getElementById("adminLoginPopup");
+        if(loginPopup && loginPopup.classList.contains("active")){
+            e.preventDefault();
+            submitAdminLogin();
         }
     }
 });
