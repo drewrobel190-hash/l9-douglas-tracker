@@ -994,6 +994,87 @@ function deleteScheduleItem(index){
 
 
 
+/* Boss card portrait quality:
+   - Mobile (≤768px): always the static image (keeps phones light).
+   - PC: user toggle "high" = animated gif, "low" = static image (persisted).
+   Falls back to .image whenever no gif exists for the boss. */
+function getGfxMode(){
+    try { return localStorage.getItem("gfxMode") || "high"; } catch(e){ return "high"; }
+}
+function bossImgSrc(boss){
+    const isMobile = window.matchMedia && window.matchMedia("(max-width:768px)").matches;
+    const useGif = !isMobile && getGfxMode() === "high" &&
+                   typeof bossGifs !== "undefined" && bossGifs[boss.name];
+    return useGif ? bossGifs[boss.name] : boss.image;
+}
+/* Swap already-rendered boss portraits when the PC quality toggle changes,
+   without rebuilding every card. */
+function applyGfxMode(){
+    const high = getGfxMode() === "high";
+    const isMobile = window.matchMedia && window.matchMedia("(max-width:768px)").matches;
+    document.querySelectorAll("img.boss-img[data-boss]").forEach(im => {
+        const name = im.getAttribute("data-boss");
+        const png  = im.getAttribute("data-png");
+        const gif  = (typeof bossGifs !== "undefined") ? bossGifs[name] : null;
+        const want = (high && !isMobile && gif) ? gif : png;
+        if(im.getAttribute("src") !== want) im.setAttribute("src", want);
+    });
+    const btn = document.getElementById("gfxToggleBtn");
+    if(btn) btn.textContent = high ? "🎬 High" : "🖼️ Low";
+}
+function toggleGfxMode(){
+    const newMode = getGfxMode() === "high" ? "low" : "high";
+    try { localStorage.setItem("gfxMode", newMode); } catch(e){}
+    playGfxTransition(newMode);
+}
+/* Neon sweep transition when switching quality: cover the screen, swap the
+   portraits while hidden, then wipe away. */
+function playGfxTransition(mode){
+    const high = mode === "high";
+    const accent = high ? "#00f0ff" : "#ff2bd6";
+    document.querySelectorAll(".gfx-transition,.gfx-flash").forEach(e => e.remove());  // no stacking
+
+    // Neon sweep overlay + glitch label
+    const label = high ? "🎬 HIGH" : "🖼️ LOW";
+    const ov = document.createElement("div");
+    ov.className = "gfx-transition";
+    ov.style.setProperty("--gfx-accent", accent);
+    ov.innerHTML = `<div class="gfx-transition-label" data-text="${label}">${label}</div>`;
+    document.body.appendChild(ov);
+    requestAnimationFrame(() => ov.classList.add("cover"));   // sweep in
+
+    // At peak coverage: swap portraits, pop a color flash, cascade the cards.
+    setTimeout(() => {
+        applyGfxMode();
+        const flash = document.createElement("div");
+        flash.className = "gfx-flash";
+        flash.style.setProperty("--gfx-accent", accent);
+        document.body.appendChild(flash);
+        setTimeout(() => flash.remove(), 420);
+        popBossCards();
+    }, 400);
+
+    setTimeout(() => ov.classList.add("reveal"), 430);        // sweep out
+    setTimeout(() => ov.remove(), 950);
+}
+
+/* Staggered "pop in" of every boss card — makes the whole grid cascade
+   back to life when the quality flips. */
+function popBossCards(){
+    const cards = [...document.querySelectorAll(".boss-img-wrap")]
+                    .map(w => w.parentElement).filter(Boolean);
+    cards.forEach((c, i) => {
+        c.classList.remove("gfx-pop");
+        void c.offsetWidth;                              // restart the animation
+        c.style.animationDelay = Math.min(i * 8, 320) + "ms";
+        c.classList.add("gfx-pop");
+    });
+    setTimeout(() => cards.forEach(c => {
+        c.classList.remove("gfx-pop");
+        c.style.animationDelay = "";
+    }), 1300);
+}
+
 function createCard(boss){
     const card = document.createElement("div");
     card.className="card";
@@ -1103,7 +1184,7 @@ if(lootData[boss.name] && lootData[boss.name].length > 0){
 
     card.innerHTML = `
       <div class="boss-img-wrap">
-  <img class="boss-img" src="${(typeof bossGifs !== 'undefined' && bossGifs[boss.name]) || boss.image}">
+  <img class="boss-img" data-boss="${boss.name}" data-png="${boss.image}" src="${bossImgSrc(boss)}">
   <div class="assist-badge" title="Assist is ON">🤝 Assist</div>
   <div class="claim-badge" title="Our Loot">🎁 Our Loot</div>
 </div>
@@ -1830,6 +1911,7 @@ console.log("LootData:", lootData);
 
 bosses.forEach(createCard);
 updateBadgesUI();
+applyGfxMode();
 listenTodaySchedule();
 
 

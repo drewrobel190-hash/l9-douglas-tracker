@@ -386,4 +386,5 @@ const bossGifs = {
   "Motti": "Boss GIF/36Motti.webp",
   "Nevaeh": "Boss GIF/37Navaeh.webp",
   "Tumier": "Boss GIF/38Tumier.webp",
+  "Camilia": "Boss GIF/40Camilia.webp",
 };

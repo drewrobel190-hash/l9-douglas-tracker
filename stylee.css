@@ -2273,3 +2273,97 @@ body.map-open header{ display:none; }
     .schedule-entry-left{ flex:1; min-width:0; }
     .schedule-delete{ width:auto; }
 }
+
+
+/* PC-only graphics quality toggle: hidden on mobile (phones always use static images). */
+@media (max-width:768px){ #gfxToggleBtn{ display:none !important; } }
+
+
+/* ===== Graphics-quality toggle: neon sweep transition ===== */
+.gfx-transition{
+  position:fixed; inset:0; z-index:100000; pointer-events:none;
+  display:flex; align-items:center; justify-content:center;
+  clip-path: inset(0 100% 0 0);              /* start collapsed at left edge */
+  background:
+    repeating-linear-gradient(0deg, rgba(0,240,255,0.05) 0 2px, transparent 2px 4px),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--gfx-accent,#00f0ff) 22%, transparent), transparent 62%),
+    linear-gradient(135deg,#04030a 0%,#0c0a1d 55%,#04030a 100%);
+  border-right:3px solid var(--gfx-accent,#00f0ff);
+  box-shadow: inset -24px 0 60px -20px var(--gfx-accent,#00f0ff);
+}
+.gfx-transition.cover{  animation: gfxSweepIn  .40s cubic-bezier(.7,0,.3,1) forwards; }
+.gfx-transition.reveal{ animation: gfxSweepOut .48s cubic-bezier(.7,0,.3,1) forwards; }
+@keyframes gfxSweepIn  { from{ clip-path: inset(0 100% 0 0);} to{ clip-path: inset(0 0 0 0);} }
+@keyframes gfxSweepOut { from{ clip-path: inset(0 0 0 0);}    to{ clip-path: inset(0 0 0 100%);} }
+
+.gfx-transition-label{
+  font-family:'Orbitron',sans-serif; font-weight:900;
+  font-size:clamp(2rem,8vw,5.5rem); letter-spacing:.16em;
+  color:var(--gfx-accent,#00f0ff);
+  text-shadow:0 0 18px var(--gfx-accent,#00f0ff), 0 0 44px var(--gfx-accent,#00f0ff);
+  animation: gfxLabel .9s ease forwards, gfxGlitch .16s steps(2,end) 4;
+}
+@keyframes gfxLabel{
+  0%{ opacity:0; transform:scale(.82) skewX(-6deg); }
+  28%{ opacity:1; transform:scale(1) skewX(0); }
+  72%{ opacity:1; }
+  100%{ opacity:0; transform:scale(1.06); }
+}
+/* RGB-split glitch flicker on the label (only text-shadow, so it never fights
+   the scale/opacity animation above) */
+@keyframes gfxGlitch{
+  0%,100%{ text-shadow:0 0 18px var(--gfx-accent,#00f0ff), 0 0 44px var(--gfx-accent,#00f0ff); }
+  25%{ text-shadow:0 0 18px var(--gfx-accent,#00f0ff), -4px 0 2px #ff2bd6, 4px 0 2px #00f0ff; }
+  75%{ text-shadow:0 0 18px var(--gfx-accent,#00f0ff),  4px 0 2px #ff2bd6, -4px 0 2px #00f0ff; }
+}
+
+/* Color flash burst at the swap moment */
+.gfx-flash{
+  position:fixed; inset:0; z-index:100001; pointer-events:none;
+  background:radial-gradient(circle at 50% 50%, var(--gfx-accent,#00f0ff), transparent 68%);
+  mix-blend-mode:screen;
+  animation: gfxFlash .40s ease-out forwards;
+}
+@keyframes gfxFlash{ 0%{ opacity:.6; } 100%{ opacity:0; } }
+
+/* Staggered pop-in of each boss card when quality flips */
+.card.gfx-pop{ animation: gfxCardPop .5s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes gfxCardPop{
+  0%{   opacity:.25; transform:translateY(9px) scale(.93); filter:brightness(1.9) saturate(1.4); }
+  55%{  opacity:1;   filter:brightness(1.25); }
+  100%{ opacity:1;   transform:none;          filter:none; }
+}
+
+@media (prefers-reduced-motion: reduce){
+  .gfx-transition, .gfx-flash{ display:none !important; }
+  .card.gfx-pop{ animation:none !important; }
+}
+
+
+/* ===== Tiny floating pill holding the PC-only graphics quality toggle ===== */
+.gfx-bar{
+  position:fixed; left:50%; transform:translateX(-50%); right:auto; bottom:8px; z-index:900;
+  display:flex; align-items:center; gap:6px;
+  padding:3px 6px 3px 9px;
+  background:linear-gradient(0deg,#04030a 0%, rgba(12,10,29,0.94) 100%);
+  border:1px solid var(--line-strong, rgba(0,240,255,0.35));
+  border-radius:999px;
+  box-shadow:0 3px 14px -6px rgba(0,240,255,0.45);
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+}
+.gfx-bar-label{
+  font-family:var(--font-display,'Orbitron',sans-serif);
+  font-size:0.44rem; letter-spacing:0.14em; text-transform:uppercase;
+  color:var(--text-dim,#8390c2);
+}
+/* shrink just this button (not the shared .map-btn) */
+#gfxToggleBtn{
+  font-size:0.6rem; padding:3px 9px; line-height:1; border-radius:999px;
+}
+/* small clearance so the pill never covers the last row */
+body{ padding-bottom:40px; }
+/* PC-only: hide on mobile (and reclaim the space) */
+@media (max-width:768px){
+  .gfx-bar{ display:none !important; }
+  body{ padding-bottom:0; }
+}

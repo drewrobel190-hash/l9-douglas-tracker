@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="stylee.css?v=9">
+<link rel="stylesheet" href="stylee.css?v=14">
 
 
 </head>
@@ -51,7 +51,7 @@
     <button class="admin-btn" onclick="adminLogin()">
         Admin
     </button>
-    
+
 </div>
 
 
@@ -343,13 +343,19 @@
   </div>
 </div>
 
+<!-- Bottom bar: PC-only boss-portrait quality toggle -->
+<footer class="gfx-bar" id="gfxBar">
+   <span class="gfx-bar-label">Boss Portraits</span>
+   <button id="gfxToggleBtn" class="map-btn" onclick="toggleGfxMode()" title="Toggle animated boss portraits (PC only)">🎬 High</button>
+</footer>
+
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="js/options.js?v=2"></script>
-<script src="js/bosses.js?v=4"></script>
+<script src="js/bosses.js?v=5"></script>
 <script src="js/lootdata.js?v=3"></script>
 <script src="js/continents.js?v=2"></script>
-<script src="js/Douglas.js?v=12"></script>
+<script src="js/Douglas.js?v=16"></script>
 </body>
 </html>
 
