@@ -51,13 +51,11 @@ body{
     color:var(--text);
     letter-spacing:0.3px;
 
-    background:
-        radial-gradient(circle at 18% -10%, rgba(123,59,255,0.18), transparent 45%),
-        radial-gradient(circle at 90% 0%, rgba(255,43,214,0.12), transparent 40%),
-        linear-gradient(-45deg,#04030a,#070514,#0b0820,#05030f);
-    background-size:100% 100%,100% 100%,300% 300%;
-    background-attachment:fixed;
-    animation:darkFlow 18s ease infinite;
+    /* solid dark base — the animated color/grid layers live in body::before,
+       which is position:fixed so it doesn't cost anything on scroll.
+       Removing background-attachment:fixed + the darkFlow animation here
+       eliminates the biggest scroll/repaint cost the site was paying. */
+    background:var(--bg-0);
 }
 
 /* perspective grid + scanline haze, fixed behind everything */
@@ -80,7 +78,9 @@ body::before{
         44px 44px,
         44px 44px,
         100% 3px;
-    animation:gridDrift 22s linear infinite;
+    /* gridDrift removed — animating background-position on 5 layers was
+       one of the top per-frame paint costs on the page. The static grid
+       looks nearly identical (the drift was very subtle). */
 }
 
 /* a single neon line sweeping down the viewport */
@@ -93,10 +93,11 @@ body::after{
     height:140px;
     pointer-events:none;
     z-index:99998;
-    background:linear-gradient(180deg, transparent, rgba(0,240,255,0.06) 60%, rgba(0,240,255,0.14) 88%, transparent);
-    mix-blend-mode:screen;
+    /* Drop mix-blend-mode:screen — it forces every frame to composite the
+       whole viewport. Same visual weight via plain opacity. */
+    background:linear-gradient(180deg, transparent, rgba(0,240,255,0.05) 60%, rgba(0,240,255,0.09) 88%, transparent);
     animation:scanSweep 7s linear infinite;
-    opacity:0.7;
+    opacity:0.55;
 }
 
 @keyframes darkFlow{
@@ -174,8 +175,9 @@ header{
     top:0;
     z-index:9999;
 
-    background:linear-gradient(180deg, rgba(7,5,20,0.92), rgba(7,5,20,0.66));
-    backdrop-filter:blur(10px);
+    /* opaque header — no backdrop-filter blur, which is by far the
+       most expensive thing a sticky element can do (re-blurs on every scroll). */
+    background:linear-gradient(180deg, rgba(7,5,20,0.98), rgba(7,5,20,0.94));
     border-bottom:1px solid var(--line-strong);
     box-shadow:0 6px 30px rgba(0,0,0,0.6), 0 1px 0 rgba(255,43,214,0.25);
 }
@@ -392,10 +394,14 @@ select option{
     box-shadow:0 0 10px rgba(255,43,214,0.7);
 }
 
-/* "Today" cards burn red-hot */
+/* "Today" cards burn red-hot — static peak glow (animating box-shadow every
+   frame on multiple cards was one of the heaviest paint costs). */
 #todayGrid .card{
     border-left:3px solid var(--red);
-    animation:softGlow 3.5s ease-in-out infinite alternate;
+    box-shadow:
+        inset 0 0 0 1px rgba(255,46,94,0.35),
+        0 10px 30px rgba(0,0,0,0.55),
+        0 0 22px rgba(255,46,94,0.4);
 }
 #todayGrid .card::before{ border-color:var(--red); }
 @keyframes softGlow{
@@ -444,6 +450,25 @@ select option{
     filter:saturate(1.15) contrast(1.05);
 }
 
+/* hover crossfade: the animated GIF dissolves over the static portrait (PC only) */
+.boss-gif{
+    position:absolute;
+    top:0;
+    left:0;
+    width:110px;
+    height:150px;
+    object-fit:cover;
+    object-position:center;
+    display:block;
+    filter:saturate(1.15) contrast(1.05);
+    opacity:0;
+    transition:opacity 0.55s ease;
+    pointer-events:none;
+}
+.boss-img-wrap.has-gif .boss-img{ transition:opacity 0.55s ease; }
+.boss-img-wrap.has-gif.gif-on .boss-gif{ opacity:1; }
+.boss-img-wrap.has-gif.gif-on .boss-img{ opacity:0; }
+
 .name{
     font-family:var(--font-display);
     font-weight:700;
@@ -464,7 +489,8 @@ select option{
     display:inline-block;
     position:relative;
     text-shadow:0 0 8px rgba(0,240,255,0.55), 0 0 16px rgba(0,240,255,0.25);
-    animation:timerPulse 2.6s ease-in-out infinite;
+    /* removed timerPulse — 40+ elements pulsing at once was needless paint,
+       and the second-by-second countdown already provides visible motion. */
 }
 @keyframes timerPulse{
     0%,100%{ opacity:0.9; }
@@ -1228,6 +1254,9 @@ body::-webkit-scrollbar-thumb:hover{ background:linear-gradient(180deg,var(--cya
 .close-btn{ cursor:pointer; font-size:20px; color:var(--magenta); }
 
 /* ===================== MAP OVERLAY ===================== */
+/* hide the sticky site header while the map is open (all screen sizes) */
+body.map-open header{ display:none; }
+
 .map-overlay{
     position:fixed;
     inset:0;
@@ -1551,9 +1580,55 @@ body::-webkit-scrollbar-thumb:hover{ background:linear-gradient(180deg,var(--cya
     box-shadow:0 0 50px rgba(0,0,0,0.7), 0 0 40px rgba(0,240,255,0.1);
 }
 .schedule-admin-box{ margin:18px 0 16px; }
-.schedule-input-row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
-.schedule-input-row input[type="time"]{ min-width:130px; }
-.schedule-input-row input[type="text"]{ flex:1; min-width:220px; }
+.schedule-input-row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.schedule-input-row input[type="time"]{ min-width:110px; flex:0 0 110px; }
+.schedule-input-row input[type="text"]{ flex:1 1 160px; min-width:0; }
+
+/* toggle chips for the "Tomorrow" and "2nd Guild" checkboxes */
+.sched-opt{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    padding:5px 8px;
+    font-family:var(--font-mono);
+    font-size:10.5px;
+    font-weight:700;
+    letter-spacing:0.6px;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    background:rgba(0,240,255,0.04);
+    border:1px solid var(--line);
+    border-radius:6px;
+    cursor:pointer;
+    user-select:none;
+    transition:all 0.2s ease;
+    white-space:nowrap;
+}
+.sched-opt input[type="checkbox"]{
+    margin:0;
+    accent-color:var(--cyan);
+    cursor:pointer;
+}
+.sched-opt:hover{
+    color:var(--text);
+    border-color:var(--line-strong);
+    background:rgba(0,240,255,0.09);
+}
+.sched-opt:has(input:checked){
+    color:var(--cyan);
+    border-color:var(--cyan);
+    background:rgba(0,240,255,0.14);
+    box-shadow:0 0 10px rgba(0,240,255,0.28), inset 0 0 6px rgba(0,240,255,0.10);
+    text-shadow:0 0 6px rgba(0,240,255,0.45);
+}
+.sched-opt-2nd input[type="checkbox"]{ accent-color:var(--green); }
+.sched-opt-2nd:has(input:checked){
+    color:var(--green);
+    border-color:var(--green);
+    background:rgba(0,255,163,0.14);
+    box-shadow:0 0 10px rgba(0,255,163,0.30), inset 0 0 6px rgba(0,255,163,0.10);
+    text-shadow:0 0 6px rgba(0,255,163,0.45);
+}
 .schedule-list{
     margin-top:18px;
     display:flex;
@@ -1633,90 +1708,134 @@ body::-webkit-scrollbar-thumb:hover{ background:linear-gradient(180deg,var(--cya
 #historyList::-webkit-scrollbar-thumb{ background:linear-gradient(180deg,var(--amber),#b98d1f); border-radius:10px; }
 #historyList::-webkit-scrollbar-thumb:hover{ background:linear-gradient(180deg,#ffd95c,var(--amber)); }
 
-/* ===================== ASSIST / CLAIM BADGES ===================== */
-.assist-badge{
+/* ===================== ASSIST / OUR LOOT BADGES (cyber HUD) ===================== */
+.assist-badge,
+.claim-badge{
     position:absolute;
-    left:8px;
-    bottom:5px;
+    left:6px;
+    bottom:6px;
     display:none;
     align-items:center;
-    gap:6px;
-    padding:2px 6px;
-    border-radius:999px;
+    padding:4px 11px 4px 11px;
     font-family:var(--font-mono);
-    font-size:9px;
+    font-size:9.5px;
     font-weight:800;
-    color:#bff7d4;
-    background:linear-gradient(145deg,rgba(0,255,163,0.22),rgba(7,5,20,0.7));
-    border:1px solid rgba(0,255,163,0.4);
+    line-height:1;
+    letter-spacing:1.8px;
+    text-transform:uppercase;
     backdrop-filter:blur(8px);
     -webkit-backdrop-filter:blur(8px);
     opacity:0;
     transform:translateY(2px);
     transition:all 0.25s ease;
     z-index:5;
-}
-.assist-badge::before{
-    content:"";
-    width:6px; height:6px;
-    border-radius:50%;
-    background:radial-gradient(circle,#34d399 35%,#059669 70%);
-    box-shadow:0 0 8px rgba(0,255,163,0.8);
-    animation:assistPulse 1.6s ease-in-out infinite;
-}
-.card.assist-on .assist-badge{ display:inline-flex; opacity:1; transform:translateY(0); text-shadow:0 0 10px rgba(0,255,163,0.3); }
-.card.assist-on{ box-shadow:inset 0 0 0 1px rgba(0,255,163,0.25), 0 0 20px rgba(0,255,163,0.12); }
-.card.assist-on:hover .assist-badge{ filter:brightness(1.08); box-shadow:0 10px 26px rgba(0,0,0,0.5), 0 0 26px rgba(0,255,163,0.3); }
-@keyframes assistPulse{
-    0%{ transform:scale(1); opacity:0.75; }
-    50%{ transform:scale(1.35); opacity:1; }
-    100%{ transform:scale(1); opacity:0.75; }
+    overflow:hidden;
+    isolation:isolate;
+    /* chamfered corners (top-left + bottom-right cut) — same look as the buttons/modals */
+    clip-path:polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px);
 }
 
-.claim-badge{
-    position:absolute;
-    left:8px;
-    bottom:5px;
-    display:none;
-    align-items:center;
-    gap:4px;
-    padding:2px 6px;
-    border-radius:999px;
-    font-family:var(--font-mono);
-    font-size:9px;
-    font-weight:800;
-    color:#ffe8a3;
-    background:linear-gradient(145deg,rgba(255,180,0,0.25),rgba(7,5,20,0.7));
-    border:1px solid rgba(255,180,0,0.5);
-    backdrop-filter:blur(8px);
-    -webkit-backdrop-filter:blur(8px);
-    opacity:0;
-    transform:translateY(2px);
-    transition:all 0.25s ease;
-    z-index:6;
-}
+/* HUD edge stripe — replaces the old pulsing dot.
+   Sits flush against the left side and softly breathes. */
+.assist-badge::before,
 .claim-badge::before{
     content:"";
-    width:6px; height:6px;
-    border-radius:50%;
-    background:radial-gradient(circle,#ffd54f 35%,#ffb400 70%);
-    box-shadow:0 0 10px rgba(255,180,0,0.85);
-    animation:claimPulse 1.6s ease-in-out infinite;
-}
-.card.claim-on .claim-badge{ display:inline-flex; opacity:1; transform:translateY(0); }
-.card.claim-on{ box-shadow:inset 0 0 0 1px rgba(255,180,0,0.3), 0 0 22px rgba(255,180,0,0.12); }
-@keyframes claimPulse{
-    0%{ transform:scale(1); opacity:0.75; }
-    50%{ transform:scale(1.35); opacity:1; }
-    100%{ transform:scale(1); opacity:0.75; }
+    position:absolute;
+    top:0;
+    left:0;
+    width:2.5px;
+    height:100%;
+    z-index:3;
+    pointer-events:none;
 }
 
-/* badge exclusivity + hide during loot view */
+/* keep the label crisp above the shimmer */
+.assist-badge .badge-text,
+.claim-badge .badge-text{
+    position:relative;
+    z-index:3;
+}
+
+/* holographic sweep — animated highlight glides across the badge */
+.assist-badge::after,
+.claim-badge::after{
+    content:"";
+    position:absolute;
+    top:0;
+    left:-100%;
+    width:55%;
+    height:100%;
+    pointer-events:none;
+    z-index:2;
+    background:linear-gradient(100deg, transparent 10%, rgba(255,255,255,0.32) 50%, transparent 90%);
+    animation:badgeShimmer 3.2s linear infinite;
+}
+@keyframes badgeShimmer{
+    0%   { left:-100%; }
+    100% { left:200%;  }
+}
+
+/* --- ASSIST (mint/cyber green) --- */
+.assist-badge{
+    color:#bff7d4;
+    background:linear-gradient(135deg, rgba(0,255,163,0.22), rgba(7,5,20,0.85));
+    border:1px solid rgba(0,255,163,0.55);
+    box-shadow:
+        0 0 12px rgba(0,255,163,0.32),
+        inset 0 0 8px rgba(0,255,163,0.10);
+}
+.assist-badge::before{
+    background:linear-gradient(180deg, transparent 0%, #5dffb6 25%, #00ff9c 50%, #5dffb6 75%, transparent 100%);
+    box-shadow:0 0 10px rgba(0,255,163,0.9), 0 0 18px rgba(0,255,163,0.4);
+    animation:edgePulse 1.8s ease-in-out infinite;
+}
+
+/* --- OUR LOOT (gold cyber) --- */
+.claim-badge{
+    color:#ffe8a3;
+    background:linear-gradient(135deg, rgba(255,180,0,0.26), rgba(7,5,20,0.85));
+    border:1px solid rgba(255,193,7,0.6);
+    box-shadow:
+        0 0 14px rgba(255,193,7,0.42),
+        inset 0 0 8px rgba(255,193,7,0.12);
+}
+.claim-badge::before{
+    background:linear-gradient(180deg, transparent 0%, #fff1b3 25%, #ffd54f 50%, #fff1b3 75%, transparent 100%);
+    box-shadow:0 0 10px rgba(255,193,7,0.95), 0 0 18px rgba(255,193,7,0.4);
+    animation:edgePulse 1.8s ease-in-out infinite;
+}
+
+/* visible/animate-in when card is in that state */
+.card.assist-on .assist-badge{
+    display:inline-flex;
+    opacity:1;
+    transform:translateY(0);
+    text-shadow:0 0 8px rgba(0,255,163,0.45);
+}
+.card.claim-on .claim-badge{
+    display:inline-flex;
+    opacity:1;
+    transform:translateY(0);
+    text-shadow:0 0 8px rgba(255,193,7,0.50);
+}
+
+/* card outline glow when armed */
+.card.assist-on{ box-shadow:inset 0 0 0 1px rgba(0,255,163,0.30), 0 0 22px rgba(0,255,163,0.14); }
+.card.claim-on{  box-shadow:inset 0 0 0 1px rgba(255,193,7,0.34), 0 0 22px rgba(255,193,7,0.14); }
+
+.card.assist-on:hover .assist-badge,
+.card.claim-on:hover .claim-badge{ filter:brightness(1.08); }
+
+/* soft breathing for the edge stripe — brightness + opacity, no transform */
+@keyframes edgePulse{
+    0%,100% { opacity:0.70; filter:brightness(1); }
+    50%     { opacity:1;    filter:brightness(1.35); }
+}
+
+/* exclusivity + hide during loot view */
 .card.show-details .assist-badge,
 .card.show-details .claim-badge{ display:none !important; }
-.card.claim-on .claim-badge{ display:inline-flex; }
 .card.claim-on .assist-badge{ display:none !important; }
-.card.assist-on .assist-badge{ display:inline-flex; }
 .card.assist-on .claim-badge{ display:none !important; }
 
 /* ===================== ADMIN AUTH MODALS ===================== */
@@ -1991,6 +2110,25 @@ body::-webkit-scrollbar-thumb:hover{ background:linear-gradient(180deg,var(--cya
 .schedule-entry.sched-past{ opacity:0.4; }
 .schedule-entry.sched-past .schedule-time{ color:var(--text-mute); text-shadow:none; }
 
+/* auto-added 2nd-guild boss spawns (from the live boss timers) */
+.schedule-entry.sched-boss{ border-left-color:var(--green); }
+.schedule-entry.sched-boss .schedule-time{ color:var(--green); text-shadow:0 0 8px rgba(0,255,163,0.4); }
+.sched-tag{
+    display:inline-block;
+    margin-left:8px;
+    padding:1px 7px;
+    font-family:var(--font-mono);
+    font-size:9px;
+    font-weight:700;
+    letter-spacing:0.5px;
+    text-transform:uppercase;
+    color:var(--green);
+    background:rgba(0,255,163,0.12);
+    border:1px solid rgba(0,255,163,0.4);
+    border-radius:999px;
+    vertical-align:middle;
+}
+
 /* ===================== MOBILE PERFORMANCE ===================== */
 /* Phones choke on continuous animations + backdrop blur + blend modes.
    Disable the expensive effects under 768px; the neon look stays (just static). */
@@ -2027,6 +2165,8 @@ body::-webkit-scrollbar-thumb:hover{ background:linear-gradient(180deg,var(--cya
     .timer{ animation:none; }
     .site-title{ animation:none; }
     .continent-tab.active::after{ animation:none; }
+    .assist-badge::after,
+    .claim-badge::after{ animation:none; display:none; }   /* kill holo shimmer on phones */
 
     /* avoid sticky :hover transform/glow after a tap */
     .card{ transition:none; }

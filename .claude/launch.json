@@ -4,7 +4,7 @@
     {
       "name": "tracker",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "5577", "--directory", "C:/Users/ulula/Desktop/Douglas timer"],
+      "runtimeArgs": ["-m", "http.server", "5577", "--directory", "C:/Temp/DouglasTimer"],
       "port": 5577
     }
   ]

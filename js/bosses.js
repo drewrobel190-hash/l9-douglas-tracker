@@ -197,12 +197,22 @@ location: "Corrupted Basin > Benji's Cave"
 
 { name:"Rakajeth", type:"fixed",
 schedule:[
-   {day:2,time:"22:00"},
-   {day:0,time:"19:00"}
+   {day:2,time:"22:20"},
+   {day:0,time:"20:45"}
 ],
 image:"Pictures/Rakajeth.png",
 info: "Level 70 Field Boss",
 location: "Corrupted Basin > Benji's Cave"
+},
+
+{ name:"Camilia", type:"fixed",
+schedule:[{day:4,time:"21:00"}],
+image:"Pictures/Camilia.png"
+},
+
+{ name:"Lucus", type:"fixed",
+schedule:[{day:6,time:"22:00"}],
+image:"Pictures/Lucus.png"
 },
 {
     
@@ -334,3 +344,46 @@ image:"Pictures/Tumier.png"},
      // Thursday
       // Friday
        // Saturday
+
+/* Animated boss GIFs (webp) shown on boss cards; falls back to .image when absent. */
+const bossGifs = {
+  "Venatus": "Boss GIF/1Venatus.webp",
+  "Viorent": "Boss GIF/2Viorent.webp",
+  "Ego": "Boss GIF/3Ego.webp",
+  "Livera": "Boss GIF/5Livera.webp",
+  "Araneo": "Boss GIF/6Araneo.webp",
+  "Undomiel": "Boss GIF/7Undomiel.webp",
+  "Lady Dalia": "Boss GIF/9LadyDalia.webp",
+  "General Aquleus": "Boss GIF/10GeneralAquleus.webp",
+  "Amentis": "Boss GIF/13Amentis.webp",
+  "Baron Braudmore": "Boss GIF/14BaronBraudmore.webp",
+  "Wannitas": "Boss GIF/16Wannitas.webp",
+  "Metus": "Boss GIF/17Metus.webp",
+  "Duplican": "Boss GIF/18Duplican.webp",
+  "Shuliar": "Boss GIF/19Shuliar.webp",
+  "Gareth": "Boss GIF/22Gareth.webp",
+  "Titore": "Boss GIF/23Titore.webp",
+  "Larba": "Boss GIF/24Larba.webp",
+  "Catena": "Boss GIF/25Catena.webp",
+  "Secreta": "Boss GIF/27Secreta.webp",
+  "Ordo": "Boss GIF/28Ordo.webp",
+  "Asta": "Boss GIF/29Asta.webp",
+  "Supore": "Boss GIF/30Supore.webp",
+  "Clemantis": "Boss GIF/4Clemantis.webp",
+  "Saphirus": "Boss GIF/8Saphirus.webp",
+  "Neutro": "Boss GIF/12Neutro.webp",
+  "Thymele": "Boss GIF/11Thymele.webp",
+  "Milavy": "Boss GIF/15Milavy.webp",
+  "Ringor": "Boss GIF/21Ringor.webp",
+  "Roderick": "Boss GIF/20Roderick.webp",
+  "Auraq": "Boss GIF/26Auraq.webp",
+  "Chaiflock": "Boss GIF/31Chaiflock.webp",
+  "Benji": "Boss GIF/32Benji.webp",
+  "Libitina": "Boss GIF/33Libitina.webp",
+  "Rakajeth": "Boss GIF/34Rakajeth.webp",
+  "Lucus": "Boss GIF/39Lucus.webp",
+  "Icaruthia": "Boss GIF/35Icaruthia.webp",
+  "Motti": "Boss GIF/36Motti.webp",
+  "Nevaeh": "Boss GIF/37Navaeh.webp",
+  "Tumier": "Boss GIF/38Tumier.webp",
+};

@@ -858,28 +858,43 @@ function renderTodaySchedule(){
 const SCHEDULE_SHEET = {
     id: "1ZhK_aO2nLzLcMgrb1jWw3DOctlkR1US_CciHd_E2GZI",
     gid: "921196904",
-    nameCol: 1,   // "NAME-EN"
-    timeCol: 3    // "Day Spawn"  e.g. "Tue, 23/06/2026 19:00"
+    nameCol: 1,     // "NAME-EN"
+    dateCol: 0,     // "e"  gviz datetime, e.g. Date(2026,6,14,21,20,0) — full spawn date+time
+    timeCol: 3      // "Day Spawn" string fallback, e.g. "Tue, 14/07/2026 20:20" ("None" for fixed bosses)
 };
 let scheduleEvents = [];
 
 function parseScheduleSheet(table){
     const rows = (table && table.rows) || [];
     const shift = (scheduleOffset() - 7) * 3600000;   // sheet is UTC+7 -> local
-    const re = /(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/;
+    // gviz encodes datetimes as "Date(Y,M,D,h,m[,s])" with a 0-based month.
+    const gvizRe = /Date\((\d+),(\d+),(\d+),(\d+),(\d+)/;
+    const strRe  = /(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})/;   // DD/MM/YYYY HH:MM
     const out = [];
 
     rows.forEach(r => {
         const c = r.c || [];
         const nameCell = c[SCHEDULE_SHEET.nameCol];
-        const timeCell = c[SCHEDULE_SHEET.timeCol];
         const name = (nameCell && nameCell.v != null) ? String(nameCell.v).trim() : "";
+        if(!name) return;
+
+        // Primary: the datetime column carries a real date+time for every
+        // spawn — including fixed-time bosses (e.g. Rakajeth) whose text
+        // "Day Spawn" column just reads "None". Month is already 0-based.
+        const dateCell = c[SCHEDULE_SHEET.dateCol];
+        const dv = (dateCell && dateCell.v != null) ? String(dateCell.v) : "";
+        const g = dv.match(gvizRe);
+        if(g){
+            const localMs = Date.UTC(+g[1], +g[2], +g[3], +g[4], +g[5]) + shift;
+            out.push({ name, localMs });
+            return;
+        }
+
+        // Fallback: parse the "Day Spawn" string if the datetime cell is empty.
+        const timeCell = c[SCHEDULE_SHEET.timeCol];
         const raw  = (timeCell && timeCell.v != null) ? String(timeCell.v).trim() : "";
-        if(!name || !raw) return;
-
-        const m = raw.match(re);            // DD/MM/YYYY HH:MM
+        const m = raw.match(strRe);
         if(!m) return;                      // skips "None" / blank rows
-
         const localMs = Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]) + shift;
         out.push({ name, localMs });
     });
@@ -1088,7 +1103,7 @@ if(lootData[boss.name] && lootData[boss.name].length > 0){
 
     card.innerHTML = `
       <div class="boss-img-wrap">
-  <img class="boss-img" src="${boss.image}">
+  <img class="boss-img" src="${(typeof bossGifs !== 'undefined' && bossGifs[boss.name]) || boss.image}">
   <div class="assist-badge" title="Assist is ON">🤝 Assist</div>
   <div class="claim-badge" title="Our Loot">🎁 Our Loot</div>
 </div>
