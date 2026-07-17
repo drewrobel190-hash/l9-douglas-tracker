@@ -816,7 +816,12 @@ function scheduleOffset(){
 function renderTodaySchedule(){
     if(!scheduleList) return;
 
-    if(!scheduleEvents || scheduleEvents.length === 0){
+    // Merge the public spawn sheet with admin-added manual events.
+    const sheetEvents  = (scheduleEvents || []).map(e => ({ name: e.name, localMs: e.localMs, isBoss: false, isManual: false }));
+    const manualEvents = getManualScheduleEvents();
+    const all = sheetEvents.concat(manualEvents).sort((a, b) => a.localMs - b.localMs);
+
+    if(all.length === 0){
         scheduleList.innerHTML = `<div class="schedule-empty">No schedule loaded for today or tomorrow.</div>`;
         return;
     }
@@ -832,17 +837,23 @@ function renderTodaySchedule(){
         { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "UTC" });
 
     const section = (title, from, to) => {
-        const list = scheduleEvents.filter(e => e.localMs >= from && e.localMs < to);
+        const list = all.filter(e => e.localMs >= from && e.localMs < to);
         if(!list.length){
             return `<div class="sched-group">${title}</div><div class="schedule-empty">Nothing scheduled.</div>`;
         }
         const rows = list.map(e => {
             const past = e.localMs < nowLocal ? " sched-past" : "";
-            return `<div class="schedule-entry${past}">
+            const bossCls = e.isBoss ? " sched-boss" : "";
+            const tag = e.isBoss ? `<span class="sched-tag">2nd Guild</span>` : "";
+            const delBtn = (e.isManual && isAdmin)
+                ? `<button class="schedule-delete" onclick="deleteScheduleItem('${e._dateKey}',${e._index})">Delete</button>`
+                : "";
+            return `<div class="schedule-entry${past}${bossCls}">
                         <div class="schedule-entry-left">
                             <span class="schedule-time">${fmtTime(e.localMs)}</span>
-                            <span class="schedule-text">${attEscape(e.name).replace(/\n+/g, " · ")}</span>
+                            <span class="schedule-text">${attEscape(e.name).replace(/\n+/g, " · ")}${tag}</span>
                         </div>
+                        ${delBtn}
                     </div>`;
         }).join("");
         return `<div class="sched-group">${title}</div>${rows}`;
@@ -863,6 +874,15 @@ const SCHEDULE_SHEET = {
     timeCol: 3      // "Day Spawn" string fallback, e.g. "Tue, 14/07/2026 20:20" ("None" for fixed bosses)
 };
 let scheduleEvents = [];
+
+/* Manual (admin-added) schedule entries, Firebase-backed and live-synced.
+   Each entry = { localMs, text, secondGuild } under dailySchedules/<PH-day-key>. */
+let manualScheduleTodayKey = "";
+let manualScheduleTomorrowKey = "";
+let manualScheduleTodayEntries = [];
+let manualScheduleTomorrowEntries = [];
+let manualScheduleTodayRef = null;
+let manualScheduleTomorrowRef = null;
 
 function parseScheduleSheet(table){
     const rows = (table && table.rows) || [];
@@ -920,19 +940,73 @@ function loadSheetSchedule(){
         });
 }
 
-/* Firebase daily schedule is no longer used to drive the popup. */
-function listenTodaySchedule(){ /* sheet-driven now */ }
+/* -------- Manual schedule entries (Firebase-backed) --------
+   Admin can add extra events on top of the spawn sheet. Each entry is
+   { localMs, text, secondGuild } stored under dailySchedules/<PH-day-key>/<index>.
+   Live listeners keep every open browser in sync. */
+
+function getScheduleDayKey(offset){
+    // Always keyed by PH (UTC+8) date so it matches what the popup displays,
+    // regardless of the boss-timer timezone dropdown.
+    const phMs = Date.now() + 8 * 3600000 + (offset || 0) * 86400000;
+    const d = new Date(phMs);
+    return d.getUTCFullYear() + "-" +
+           String(d.getUTCMonth() + 1).padStart(2, "0") + "-" +
+           String(d.getUTCDate()).padStart(2, "0");
+}
+
+function listenTodaySchedule(){
+    const todayKey = getScheduleDayKey(0);
+    const tomorrowKey = getScheduleDayKey(1);
+
+    if(manualScheduleTodayKey !== todayKey){
+        if(manualScheduleTodayRef) manualScheduleTodayRef.off();
+        manualScheduleTodayKey = todayKey;
+        manualScheduleTodayEntries = [];
+        manualScheduleTodayRef = db.ref(`${DB_ROOT}/dailySchedules/` + todayKey);
+        manualScheduleTodayRef.on("value", snap => {
+            const arr = snap.val() || [];
+            manualScheduleTodayEntries = arr.map((e, i) => ({ ...e, _dateKey: todayKey, _index: i }));
+            if(document.getElementById("schedulePopup")?.classList.contains("active")) renderTodaySchedule();
+        });
+    }
+
+    if(manualScheduleTomorrowKey !== tomorrowKey){
+        if(manualScheduleTomorrowRef) manualScheduleTomorrowRef.off();
+        manualScheduleTomorrowKey = tomorrowKey;
+        manualScheduleTomorrowEntries = [];
+        manualScheduleTomorrowRef = db.ref(`${DB_ROOT}/dailySchedules/` + tomorrowKey);
+        manualScheduleTomorrowRef.on("value", snap => {
+            const arr = snap.val() || [];
+            manualScheduleTomorrowEntries = arr.map((e, i) => ({ ...e, _dateKey: tomorrowKey, _index: i }));
+            if(document.getElementById("schedulePopup")?.classList.contains("active")) renderTodaySchedule();
+        });
+    }
+}
+
+function getManualScheduleEvents(){
+    return [
+        ...manualScheduleTodayEntries,
+        ...manualScheduleTomorrowEntries
+    ].map(e => ({
+        name: e.text || "",
+        localMs: e.localMs,
+        isBoss: !!e.secondGuild,   // green "2nd Guild" tag when flagged
+        isManual: true,
+        _dateKey: e._dateKey,
+        _index: e._index
+    }));
+}
+
 function openSchedulePopup(){
     if(schedulePopup){
         schedulePopup.classList.add("active");
         document.body.style.overflow = "hidden";
     }
-
-    // schedule is sheet-driven now — hide the manual add box
     if(scheduleAdminBox){
-        scheduleAdminBox.style.display = "none";
+        scheduleAdminBox.style.display = isAdmin ? "block" : "none";
     }
-
+    listenTodaySchedule();
     loadSheetSchedule();
 }
 
@@ -944,49 +1018,46 @@ function closeSchedulePopup(){
 }
 
 function addTodaySchedule(){
-    if(!isAdmin){
-        alert("Admin only.");
-        return;
-    }
+    if(!isAdmin){ alert("Admin only."); return; }
 
     const timeValue = scheduleTime?.value?.trim() || "";
     const text = scheduleText?.value?.trim() || "";
+    const forTomorrow = document.getElementById("scheduleTomorrow")?.checked || false;
+    const is2nd = document.getElementById("schedule2nd")?.checked || false;
 
-    if(!text){
-        alert("Please enter an event.");
-        return;
-    }
+    if(!text){ alert("Please enter an event."); return; }
+    if(!timeValue){ alert("Please enter a time."); return; }
 
-    if(!timeValue){
-        alert("Please enter a time.");
-        return;
-    }
+    const [hh, mm] = timeValue.split(":");
+    const dayKey = forTomorrow ? getScheduleDayKey(1) : getScheduleDayKey(0);
+    const [y, mo, d] = dayKey.split("-");
+    // PH wall clock expressed as UTC ms — same format as the sheet events so both merge cleanly
+    const localMs = Date.UTC(+y, +mo - 1, +d, +hh, +mm);
 
-    const todayKey = getTodayScheduleKey(); // example: 2026-03-23
-    const localDateTime = new Date(`${todayKey}T${timeValue}:00`);
+    const source = forTomorrow ? manualScheduleTomorrowEntries : manualScheduleTodayEntries;
+    const stripped = source
+        .map(e => ({ localMs: e.localMs, text: e.text, secondGuild: !!e.secondGuild }))
+        .concat({ localMs, text, secondGuild: is2nd })
+        .sort((a, b) => (a.localMs || 0) - (b.localMs || 0));
 
-    const updated = [...todaySchedule, {
-        timestamp: localDateTime.getTime(),
-        text
-    }].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-
-    db.ref(`${DB_ROOT}/dailySchedules/` + todayKey).set(updated);
+    db.ref(`${DB_ROOT}/dailySchedules/` + dayKey).set(stripped);
 
     if(scheduleTime) scheduleTime.value = "";
     if(scheduleText) scheduleText.value = "";
+    // leave Tomorrow / 2nd-Guild checkboxes sticky — usually the next event has the same context
 }
 
-function deleteScheduleItem(index){
-    if(!isAdmin){
-        alert("Admin only.");
-        return;
-    }
+function deleteScheduleItem(dateKey, index){
+    if(!isAdmin){ alert("Admin only."); return; }
+    const source = (dateKey === manualScheduleTomorrowKey)
+        ? manualScheduleTomorrowEntries
+        : manualScheduleTodayEntries;
 
-    const updated = [...todaySchedule];
-    updated.splice(index, 1);
+    const stripped = source
+        .filter((_, i) => i !== index)
+        .map(e => ({ localMs: e.localMs, text: e.text, secondGuild: !!e.secondGuild }));
 
-    const key = getTodayScheduleKey();
-    db.ref(`${DB_ROOT}/dailySchedules/` + key).set(updated);
+    db.ref(`${DB_ROOT}/dailySchedules/` + dateKey).set(stripped.length ? stripped : null);
 }
 
 
