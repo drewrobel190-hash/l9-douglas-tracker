@@ -172,7 +172,7 @@ location: "Corrupted Basin > Auraq's Cave"
 },
 
 { name:"Chaiflock", type:"fixed",
-schedule:[{day:6,time:"22:00"}],
+schedule:[{day:0,time:"15:00"}],
 image:"Pictures/Chaiflock.png",
 info: "Level 70 Field Boss",
 location: "Corrupted Basin > Chaiflock's Cave"
