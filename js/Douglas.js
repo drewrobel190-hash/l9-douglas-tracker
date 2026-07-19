@@ -27,6 +27,7 @@ async function loadBossData(){
 
     updateTimers();
     sortBosses();
+    refreshScheduleIfOpen();   // pick up timers set by other admins
 }
 
 loadBossData();
@@ -813,13 +814,39 @@ function scheduleOffset(){
     return 8;
 }
 
+/* 2nd-guild rotation bosses: whenever an admin sets a timer on one of these,
+   its spawn is auto-listed on the Today Schedule with a "2nd Guild" tag. */
+const GUILD2_BOSSES = ["Venatus", "Viorent", "Ego", "Livera", "Araneo", "Undomiel"];
+
+function getGuildBossEvents(){
+    const out = [];
+    GUILD2_BOSSES.forEach(name => {
+        const saved = cloudData[name];
+        let spawn = null;
+        if(saved && typeof saved === "object") spawn = saved.spawn;
+        else if(typeof saved === "number") spawn = saved;
+        if(!spawn) return;
+        // boss spawn is an absolute UTC timestamp → express it as PH wall clock
+        out.push({ name: name, localMs: spawn + 8 * 3600000, isBoss: true, isManual: false });
+    });
+    return out;
+}
+
+/* Re-render the schedule only while the popup is actually open. */
+function refreshScheduleIfOpen(){
+    if(document.getElementById("schedulePopup")?.classList.contains("active")) renderTodaySchedule();
+}
+
 function renderTodaySchedule(){
     if(!scheduleList) return;
 
-    // Merge the public spawn sheet with admin-added manual events.
+    // Merge the public spawn sheet + 2nd-guild boss timers + admin-added manual events.
     const sheetEvents  = (scheduleEvents || []).map(e => ({ name: e.name, localMs: e.localMs, isBoss: false, isManual: false }));
+    const bossEvents   = getGuildBossEvents().filter(b =>
+        !sheetEvents.some(s => s.name.toLowerCase().includes(b.name.toLowerCase()))   // skip if the sheet already lists it
+    );
     const manualEvents = getManualScheduleEvents();
-    const all = sheetEvents.concat(manualEvents).sort((a, b) => a.localMs - b.localMs);
+    const all = sheetEvents.concat(bossEvents).concat(manualEvents).sort((a, b) => a.localMs - b.localMs);
 
     if(all.length === 0){
         scheduleList.innerHTML = `<div class="schedule-empty">No schedule loaded for today or tomorrow.</div>`;
@@ -1637,6 +1664,7 @@ function quickSetDead(name, hours){
     cloudData[name] = { spawn: spawn, guild: guild };
     updateTimers();
     sortBosses();
+    refreshScheduleIfOpen();   // 2nd-guild bosses appear on the schedule right away
     triggerTimerAnimation(name);
 }
 
