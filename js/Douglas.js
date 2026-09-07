@@ -510,7 +510,7 @@ function restoreAdminSession(){
 const ATTENDANCE_SHEETS = {
     main: {
         id: "1SCYRJPIoxuNd2OfLIeMlrqaqyLECIP2ekLyigZ1BktI",
-        gid: "745162862",   // current week tab (resets weekly; update each new week)
+        gid: "1028424730",  // current week tab (resets weekly; update each new week)
         nameCol: 0,
         scoreCol: 2,      // "Score"
         label: "Main Guild",
@@ -900,6 +900,63 @@ const SCHEDULE_SHEET = {
 };
 let scheduleEvents = [];
 
+/* ============================================================
+   SCHEDULE-DRIVEN AUTO TIMERS
+   Priority: (1) manual TOD/timer  (2) today's schedule  (3) 10-min
+   fallback, then auto-advance by the boss interval so it never sticks.
+   Everything is derived deterministically from the shared sheet +
+   current time, so it survives refresh, works for late/multiple
+   viewers, and needs no extra Firebase writes (no duplicate timers).
+   ============================================================ */
+const SCHED_GRACE_MS = 10 * 60 * 1000;   // 10-minute fallback window after a spawn
+
+// Sheet rows are labelled "Lv98 Titore" / "Kransia Lv135 Icaruthia" — match
+// the boss name as a whole word inside that label.
+function schedNameMatches(sheetName, bossName){
+    const s = String(sheetName || "").toLowerCase().trim();
+    const b = String(bossName || "").toLowerCase().trim();
+    if(!s || !b) return false;
+    const esc = b.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp("(^|\\s)" + esc + "($|\\s)").test(s);
+}
+
+// Earliest scheduled spawn (as a real UTC instant) for this boss, or null.
+function getScheduleSpawnAbsForBoss(bossName){
+    if(!bossName || !scheduleEvents || !scheduleEvents.length) return null;
+    let earliest = null;
+    for(const e of scheduleEvents){
+        if(typeof e.absMs !== "number") continue;
+        if(schedNameMatches(e.name, bossName)){
+            if(earliest === null || e.absMs < earliest) earliest = e.absMs;
+        }
+    }
+    return earliest;
+}
+
+// Roll a base spawn forward by the interval, leaving a 10-min ready window
+// after each spawn. Pure O(1) function of (base, interval, now).
+function computeAutoSpawn(baseAbsMs, intervalMs, nowMs){
+    if(!intervalMs || intervalMs <= 0) return baseAbsMs;
+    if(nowMs < baseAbsMs + SCHED_GRACE_MS) return baseAbsMs;   // counting down or in the 10-min window
+    const n = Math.floor((nowMs - SCHED_GRACE_MS - baseAbsMs) / intervalMs) + 1;
+    return baseAbsMs + n * intervalMs;
+}
+
+// Fetch + parse the schedule sheet in the background (no popup UI), then
+// refresh the boss cards so auto-timers update. Safe to call on load + timer.
+function fetchScheduleData(){
+    return gvizLoad(SCHEDULE_SHEET.id, SCHEDULE_SHEET.gid)
+        .then(table => {
+            scheduleEvents = parseScheduleSheet(table);
+            if(typeof updateTimers === "function") updateTimers();
+            if(typeof sortBosses === "function" && !isTyping) sortBosses();
+            if(document.getElementById("schedulePopup")?.classList.contains("active")
+               && typeof renderTodaySchedule === "function") renderTodaySchedule();
+            return scheduleEvents;
+        })
+        .catch(() => scheduleEvents);   // keep last-known schedule on failure
+}
+
 function parseScheduleSheet(table){
     const rows = (table && table.rows) || [];
     const shift = (scheduleOffset() - 7) * 3600000;          // sheet is UTC+7 -> local
@@ -931,8 +988,9 @@ function parseScheduleSheet(table){
         }
 
         if(y < 2000) return;                         // guard against time-only cells
-        const localMs = Date.UTC(y, mo, d, hh, mi) + shift;
-        out.push({ name, localMs });
+        const localMs = Date.UTC(y, mo, d, hh, mi) + shift;       // PH wall clock (popup display)
+        const absMs   = Date.UTC(y, mo, d, hh, mi) - 7 * 3600000; // real UTC instant (sheet is Thai UTC+7)
+        out.push({ name, localMs, absMs });
     });
 
     out.sort((a, b) => a.localMs - b.localMs);
@@ -941,18 +999,29 @@ function parseScheduleSheet(table){
 
 function loadSheetSchedule(){
     if(!scheduleList) return;
-    scheduleList.innerHTML =
-        '<div class="att-state"><div class="att-spin"></div><div>Loading schedule…</div></div>';
+
+    if(scheduleEvents.length){
+        renderTodaySchedule();        // show what we already have instantly
+    } else {
+        scheduleList.innerHTML =
+            '<div class="att-state"><div class="att-spin"></div><div>Loading schedule…</div></div>';
+    }
 
     gvizLoad(SCHEDULE_SHEET.id, SCHEDULE_SHEET.gid)
         .then(table => {
             scheduleEvents = parseScheduleSheet(table);
             renderTodaySchedule();
+            if(typeof updateTimers === "function") updateTimers();
+            if(typeof sortBosses === "function" && !isTyping) sortBosses();
         })
         .catch(err => {
-            scheduleList.innerHTML =
-                '<div class="att-state err">Couldn\'t load the schedule sheet (' + attEscape(err.message) + ').<br>' +
-                'Make sure it\'s shared as “Anyone with the link · Viewer”.</div>';
+            if(scheduleEvents.length){
+                renderTodaySchedule();
+            } else {
+                scheduleList.innerHTML =
+                    '<div class="att-state err">Couldn\'t load the schedule sheet (' + attEscape(err.message) + ').<br>' +
+                    'Make sure it\'s shared as “Anyone with the link · Viewer”.</div>';
+            }
         });
 }
 
@@ -1406,47 +1475,62 @@ if(boss.disabled){
 
         if(boss.type === "interval"){
 
-    const saved = cloudData[boss.name];
+    const saved = cloudData[boss.name];               // manual timer (Firebase), if any
+    const intervalMs = (boss.hours || 0) * 3600000;
+    const nowMs = now.getTime();
 
-if(!saved){
-    card.classList.remove("has-timer"); // ✅ do not touch assist-on here anymore
-    timerEl.classList.remove("ready","warning");
-    timerEl.innerText = "Not Set";
-    spawnEl.innerText = "";
-    card.dataset.spawn = Infinity;
-    
-    return;
-}
-
-    let guild = "";
-
-    if(typeof saved === "object"){
-        guild = saved.guild || "";
-        spawn = new Date(saved.spawn);
-    } else {
-        spawn = new Date(saved);
+    // manual spawn + guild (manual entries are objects {spawn,guild} or a bare ms)
+    let manualSpawnMs = null, guild = "";
+    if(saved != null){
+        if(typeof saved === "object"){ manualSpawnMs = saved.spawn; guild = saved.guild || ""; }
+        else { manualSpawnMs = saved; }
     }
 
-    // ✅ show assist button only when timer exists
-card.classList.add("has-timer");
+    // scheduled spawn (real UTC instant) for today, or null if not scheduled
+    const schedBaseAbs = getScheduleSpawnAbsForBoss(boss.name);
 
+    // ---- PRIORITY: 1) manual  2) schedule (+10-min fallback/auto-advance)  3) Not Set ----
+    let effSpawnMs = null;
+    let autoDriven = false;
 
+    if(manualSpawnMs != null && (nowMs < manualSpawnMs + SCHED_GRACE_MS || schedBaseAbs == null)){
+        // (1) Manual timer wins while it's still counting down / within its 10-min
+        //     ready window, or whenever there's no schedule to fall back to.
+        effSpawnMs = manualSpawnMs;
+    } else if(schedBaseAbs != null && intervalMs > 0){
+        // (2)+(3) No active manual → the schedule drives it, with the 10-min
+        //         fallback and auto-advance so it never gets stuck at 00:00.
+        effSpawnMs = computeAutoSpawn(schedBaseAbs, intervalMs, nowMs);
+        autoDriven = true;
+        guild = "";
+    } else if(manualSpawnMs != null){
+        // stale manual + no schedule → keep it (existing ready-persist behaviour)
+        effSpawnMs = manualSpawnMs;
+    }
 
-    // ===== GUILD BADGE SYSTEM PRE =====
-    let nameEl = card.querySelector(".name");
-let existingGuildTag = nameEl.querySelector(".guild-tag");
+    if(effSpawnMs == null){
+        card.classList.remove("has-timer","auto-timer");
+        timerEl.classList.remove("ready","warning");
+        timerEl.innerText = "Not Set";
+        spawnEl.innerText = "";
+        card.dataset.spawn = Infinity;
+        return;
+    }
 
-// Fucking hustle to fix
-if(existingGuildTag){
-    existingGuildTag.remove();
-}
+    card.classList.add("has-timer");
+    card.classList.toggle("auto-timer", autoDriven);     // shows the small "AUTO" tag
+    spawn = new Date(effSpawnMs);
 
-if(guild){
-    const guildTag = document.createElement("span");
-    guildTag.className = "guild-tag";
-    guildTag.innerHTML = `<span class="crown">👑</span>${guild}`;
-    nameEl.appendChild(guildTag);
-}
+    // ===== GUILD BADGE (manual timers only) =====
+    const nameEl = card.querySelector(".name");
+    const existingGuildTag = nameEl.querySelector(".guild-tag");
+    if(existingGuildTag) existingGuildTag.remove();
+    if(guild){
+        const guildTag = document.createElement("span");
+        guildTag.className = "guild-tag";
+        guildTag.innerHTML = `<span class="crown">👑</span>${guild}`;
+        nameEl.appendChild(guildTag);
+    }
 
 } else if (boss.type === "fixed") {
     spawn = getNextFixedSpawn(boss.schedule);
@@ -2098,6 +2182,10 @@ function startTimer(){
 
     updateTimers();
     listenTodaySchedule();
+    fetchScheduleData();                       // load spawn sheet so auto-timers work without opening the popup
+
+    // keep the spawn sheet fresh (picks up schedule edits made during the day)
+    setInterval(fetchScheduleData, 5 * 60000);
 
     // 1s tick — countdowns update every second, but re-sorting the whole
     // grid (41 cards, layout thrash) is throttled to every 3s. That's still

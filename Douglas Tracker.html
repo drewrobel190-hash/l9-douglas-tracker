@@ -3,13 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<!-- Force mobile browsers to re-fetch the HTML every visit so the
+     ?v=N cache-bust on scripts/styles actually takes effect. Without
+     these, some mobile Chromes/Safaris serve a stale HTML that
+     references an old Douglas.js version and users see old sheet gids. -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+
 <title>L9 Boss Tracker</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="stylee.css?v=24">
+<link rel="stylesheet" href="stylee.css?v=27">
 
 
 </head>
@@ -351,7 +360,7 @@
 <script src="js/bosses.js?v=2"></script>
 <script src="js/lootdata.js?v=11"></script>
 <script src="js/continents.js?v=2"></script>
-<script src="js/Douglas.js?v=25"></script>
+<script src="js/Douglas.js?v=27"></script>
 </body>
 </html>
 

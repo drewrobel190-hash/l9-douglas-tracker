@@ -197,12 +197,22 @@ location: "Corrupted Basin > Benji's Cave"
 
 { name:"Rakajeth", type:"fixed",
 schedule:[
-   {day:2,time:"22:00"},
-   {day:0,time:"19:00"}
+   {day:2,time:"22:20"},
+   {day:0,time:"20:45"}
 ],
 image:"Pictures/Rakajeth.png",
 info: "Level 70 Field Boss",
 location: "Corrupted Basin > Benji's Cave"
+},
+
+{ name:"Camilia", type:"fixed",
+schedule:[{day:4,time:"21:00"}],
+image:"Pictures/Camilia.png"
+},
+
+{ name:"Lucus", type:"fixed",
+schedule:[{day:6,time:"22:00"}],
+image:"Pictures/Lucus.png"
 },
 {
     
