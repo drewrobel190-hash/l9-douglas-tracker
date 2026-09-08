@@ -510,7 +510,7 @@ function restoreAdminSession(){
 const ATTENDANCE_SHEETS = {
     main: {
         id: "1SCYRJPIoxuNd2OfLIeMlrqaqyLECIP2ekLyigZ1BktI",
-        gid: "1028424730",  // current week tab (resets weekly; update each new week)
+        gid: "2119441325",  // current week tab (resets weekly; update each new week)
         nameCol: 0,
         scoreCol: 2,      // "Score"
         label: "Main Guild",
@@ -518,7 +518,7 @@ const ATTENDANCE_SHEETS = {
     },
     second: {
         id: "1JV3HBq2OX4OXYWDxRLxSwUPibQLPQywBjIK8dD4uN7U",
-        gid: "897741575",   // current 2-week period tab (update each new period)
+        gid: "595334308",   // current 2-week period tab (update each new period)
         nameCol: 0,
         scoreCol: 2,      // "Attendance"
         label: "2nd Guild",
@@ -1201,6 +1201,73 @@ const BOSS_GIFS = {
 // true only on devices with a real mouse (desktop/laptop), false on phones/tablets
 const CAN_HOVER_GIF = !!(window.matchMedia && window.matchMedia("(hover: hover) and (pointer: fine)").matches);
 
+/* ---- PC-only "Boss Portraits" quality toggle ----
+   Gifs here are hover-only (two-layer crossfade). "High" = hover animations
+   on, "Low" = pure static portraits. Persisted in localStorage. */
+function getGfxMode(){
+    try { return localStorage.getItem("gfxMode") || "high"; } catch(e){ return "high"; }
+}
+function applyGfxMode(){
+    const high = getGfxMode() === "high";
+    if(!high){
+        // stop any gif that's currently showing / loaded
+        document.querySelectorAll(".boss-img-wrap.has-gif").forEach(wrap => {
+            wrap.classList.remove("gif-on");
+            const g = wrap.querySelector(".boss-gif");
+            if(g) g.removeAttribute("src");
+        });
+    }
+    const btn = document.getElementById("gfxToggleBtn");
+    if(btn) btn.textContent = high ? "🎬 High" : "🖼️ Low";
+}
+function toggleGfxMode(){
+    const newMode = getGfxMode() === "high" ? "low" : "high";
+    try { localStorage.setItem("gfxMode", newMode); } catch(e){}
+    playGfxTransition(newMode);
+}
+/* Neon sweep transition when switching quality. */
+function playGfxTransition(mode){
+    const high = mode === "high";
+    const accent = high ? "#00f0ff" : "#ff2bd6";
+    document.querySelectorAll(".gfx-transition,.gfx-flash").forEach(e => e.remove());
+
+    const label = high ? "🎬 HIGH" : "🖼️ LOW";
+    const ov = document.createElement("div");
+    ov.className = "gfx-transition";
+    ov.style.setProperty("--gfx-accent", accent);
+    ov.innerHTML = `<div class="gfx-transition-label" data-text="${label}">${label}</div>`;
+    document.body.appendChild(ov);
+    requestAnimationFrame(() => ov.classList.add("cover"));
+
+    setTimeout(() => {
+        applyGfxMode();
+        const flash = document.createElement("div");
+        flash.className = "gfx-flash";
+        flash.style.setProperty("--gfx-accent", accent);
+        document.body.appendChild(flash);
+        setTimeout(() => flash.remove(), 420);
+        popBossCards();
+    }, 400);
+
+    setTimeout(() => ov.classList.add("reveal"), 430);
+    setTimeout(() => ov.remove(), 950);
+}
+/* Staggered "pop in" of every boss card when quality flips. */
+function popBossCards(){
+    const cards = [...document.querySelectorAll(".boss-img-wrap")]
+                    .map(w => w.closest(".card")).filter(Boolean);
+    cards.forEach((c, i) => {
+        c.classList.remove("gfx-pop");
+        void c.offsetWidth;                              // restart the animation
+        c.style.animationDelay = Math.min(i * 8, 320) + "ms";
+        c.classList.add("gfx-pop");
+    });
+    setTimeout(() => cards.forEach(c => {
+        c.classList.remove("gfx-pop");
+        c.style.animationDelay = "";
+    }), 1300);
+}
+
 /* Wire a card's hover crossfade: load the GIF on first hover, then dissolve
    PNG -> GIF. Only ever called on PC for bosses that have a GIF. */
 function attachGifHover(card){
@@ -1218,6 +1285,7 @@ function attachGifHover(card){
     });
 
     wrap.addEventListener("mouseenter", () => {
+        if(getGfxMode() !== "high") return;              // "Low" quality = no hover animation
         hovering = true;
         if(clearTimer){ clearTimeout(clearTimer); clearTimer = null; }
         if(!gif.getAttribute("src")){
@@ -2183,6 +2251,7 @@ function startTimer(){
     updateTimers();
     listenTodaySchedule();
     fetchScheduleData();                       // load spawn sheet so auto-timers work without opening the popup
+    applyGfxMode();                            // restore saved boss-portrait quality + set the toggle label
 
     // keep the spawn sheet fresh (picks up schedule edits made during the day)
     setInterval(fetchScheduleData, 5 * 60000);
