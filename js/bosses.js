@@ -210,6 +210,18 @@ schedule:[{day:4,time:"21:00"}],
 image:"Pictures/Camilia.png"
 },
 
+  
+{ name:"Nerucas", type:"fixed",
+schedule:[{day:0,time:"16:00"}],
+image:"Pictures/Ca.png"
+},
+
+  
+{ name:"Dumenta", type:"fixed",
+schedule:[{day:0,time:"19:00"}],
+image:"Pictures/.png"
+},
+
 { name:"Lucus", type:"fixed",
 schedule:[{day:6,time:"22:00"}],
 image:"Pictures/Lucus.png"
