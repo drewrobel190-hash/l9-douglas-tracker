@@ -197,8 +197,8 @@ location: "Corrupted Basin > Benji's Cave"
 
 { name:"Rakajeth", type:"fixed",
 schedule:[
-   {day:2,time:"22:20"},
-   {day:0,time:"20:45"}
+   {day:2,time:"22:00"},
+   {day:4,time:"19:00"}
 ],
 image:"Pictures/Rakajeth.png",
 info: "Level 70 Field Boss",
@@ -264,7 +264,7 @@ image:"Pictures/Lucus.png"
 
 
 { name:"Tumier", type:"fixed",
-schedule:[{day:0,time:"19:00"}],
+schedule:[{day:1,time:"22:00"}],
 image:"Pictures/Tumier.png"},
 
 // ===== WORLD BOSSES =====
