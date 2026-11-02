@@ -213,13 +213,13 @@ image:"Pictures/Camilia.png"
   
 { name:"Nerucas", type:"fixed",
 schedule:[{day:0,time:"16:00"}],
-image:"Pictures/Ca.png"
+image:"Pictures/Nerucas.png"
 },
 
   
 { name:"Dumenta", type:"fixed",
 schedule:[{day:0,time:"19:00"}],
-image:"Pictures/.png"
+image:"Pictures/Dumenta.png"
 },
 
 { name:"Lucus", type:"fixed",
