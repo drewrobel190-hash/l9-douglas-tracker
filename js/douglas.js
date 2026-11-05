@@ -505,21 +505,13 @@ function restoreAdminSession(){
 
 const ATTENDANCE_SHEETS = {
     main: {
-        id: "1SCYRJPIoxuNd2OfLIeMlrqaqyLECIP2ekLyigZ1BktI",
-        gid: "2119441325",
+        id: "1JV3HBq2OX4OXYWDxRLxSwUPibQLPQywBjIK8dD4uN7U",
+        gid: "2052081881",
         nameCol: 0,
         scoreCol: 2,      // "Score"
         label: "Main Guild",
         cadence: "weekly"
     },
-    second: {
-        id: "1JV3HBq2OX4OXYWDxRLxSwUPibQLPQywBjIK8dD4uN7U",
-        gid: "595334308",
-        nameCol: 0,
-        scoreCol: 2,      // "Attendance"
-        label: "2nd Guild",
-        cadence: "biweekly"
-    }
 };
 
 let attendanceTab = "main";
