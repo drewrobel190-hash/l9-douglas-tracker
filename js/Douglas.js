@@ -679,11 +679,10 @@ function loadMainAttendance(){
             attendanceCache = data;
             renderAttendance(data);
         })
-        .catch(err => {
+                .catch(err => {
             listEl.innerHTML =
-                '<div class="att-state err">Couldn\\'t load the sheet (' +
-                attEscape(err.message) +
-                ').<br>Make sure it\\'s shared as “Anyone with the link · Viewer”.</div>';
+                `<div class="att-state err">Couldn't load the sheet (${attEscape(err.message)}).<br>
+                Make sure it's shared as “Anyone with the link · Viewer”.</div>`;
         });
 }
 
