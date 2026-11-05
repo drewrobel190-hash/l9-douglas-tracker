@@ -497,37 +497,26 @@ function restoreAdminSession(){
 }
 
 
+
 /* ============================================================
-   TOP ATTENDANCE — reads the guild Google Sheets live and
-   ranks members high -> low.
-     • Main guild: 1-week period
-     • 2nd guild:  2-week period
-   Both reset Sunday 24:00 UTC+7 (= Monday 00:00 UTC+7).
-   Sheets are read via the public gviz endpoint using a JSONP
-   <script> tag, which sidesteps cross-origin (CORS) limits.
+   MAIN GUILD ATTENDANCE
+   Reads the Main Guild Google Sheet and ranks members
+   from highest to lowest.
+   Weekly reset: Monday 00:00 UTC+7.
    ============================================================ */
 
 const ATTENDANCE_SHEETS = {
     main: {
-        id: "1SCYRJPIoxuNd2OfLIeMlrqaqyLECIP2ekLyigZ1BktI",
-        gid: "2119441325",  // current week tab (resets weekly; update each new week)
+        id: "1JV3HBq2OX4OXYWDxRLxSwUPibQLPQywBjIK8dD4uN7U",
+        gid: "2052081881",
         nameCol: 0,
-        scoreCol: 2,      // "Score"
+        scoreCol: 2,
         label: "Main Guild",
         cadence: "weekly"
-    },
-    second: {
-        id: "1JV3HBq2OX4OXYWDxRLxSwUPibQLPQywBjIK8dD4uN7U",
-        gid: "595334308",   // current 2-week period tab (update each new period)
-        nameCol: 0,
-        scoreCol: 2,      // "Attendance"
-        label: "2nd Guild",
-        cadence: "biweekly"
     }
 };
 
-let attendanceTab = "main";
-let attendanceCache = {};      // guild -> sorted rows (cleared each open)
+let attendanceCache = null;
 let attendanceTimer = null;
 
 function attEscape(s){
@@ -536,7 +525,6 @@ function attEscape(s){
     ));
 }
 
-/* Load a public sheet tab as gviz JSON via JSONP (no CORS issues). */
 function gvizLoad(id, gid){
     return new Promise((resolve, reject) => {
         const cb = "gviz_" + Math.random().toString(36).slice(2);
@@ -548,17 +536,31 @@ function gvizLoad(id, gid){
             if(script.parentNode) script.parentNode.removeChild(script);
         };
 
-        window[cb] = (resp) => {
+        window[cb] = resp => {
             settled = true;
             cleanup();
             if(resp && resp.table) resolve(resp.table);
             else reject(new Error("Empty response"));
         };
-        script.onerror = () => { if(!settled){ cleanup(); reject(new Error("Could not reach the sheet")); } };
-        setTimeout(() => { if(!settled){ cleanup(); reject(new Error("Timed out")); } }, 12000);
+
+        script.onerror = () => {
+            if(!settled){
+                cleanup();
+                reject(new Error("Could not reach the sheet"));
+            }
+        };
+
+        setTimeout(() => {
+            if(!settled){
+                cleanup();
+                reject(new Error("Timed out"));
+            }
+        }, 12000);
 
         script.src = "https://docs.google.com/spreadsheets/d/" + id +
-                     "/gviz/tq?gid=" + gid + "&headers=1&tqx=out:json;responseHandler:" + cb;
+            "/gviz/tq?gid=" + gid +
+            "&headers=1&tqx=out:json;responseHandler:" + cb;
+
         document.head.appendChild(script);
     });
 }
@@ -572,11 +574,15 @@ function parseAttendance(table, nameCol, scoreCol){
         const nameCell = cells[nameCol];
         const scoreCell = cells[scoreCol];
 
-        const name = (nameCell && nameCell.v != null) ? String(nameCell.v).trim() : "";
-        if(!name) return;
-        if(/^(name|names|total|totals|guild boss)$/i.test(name)) return;  // skip header/aggregate rows
+        const name = (nameCell && nameCell.v != null)
+            ? String(nameCell.v).trim() : "";
 
-        let score = (scoreCell && scoreCell.v != null) ? Number(scoreCell.v) : 0;
+        if(!name) return;
+        if(/^(name|names|total|totals|guild boss)$/i.test(name)) return;
+
+        let score = (scoreCell && scoreCell.v != null)
+            ? Number(scoreCell.v) : 0;
+
         if(isNaN(score)) score = 0;
 
         out.push({ name, score });
@@ -586,35 +592,42 @@ function parseAttendance(table, nameCol, scoreCol){
     return out;
 }
 
-/* Current period range + the next reset instant for a cadence.
-   Anchored to Mon 2026-06-22 00:00 UTC+7 (a known period start). */
-function attPeriodInfo(cadence){
+function attPeriodInfo(){
     const MS = 86400000;
-    const OFFSET = 7 * 3600000;                 // UTC+7
-    const now = new Date();
-    const now7 = now.getTime() + OFFSET;        // wall-clock ms in UTC+7 (expressed as UTC)
+    const OFFSET = 7 * 3600000;
+
+    const now7 = Date.now() + OFFSET;
     const anchor7 = Date.UTC(2026, 5, 22, 0, 0, 0);
-    const lenMs = (cadence === "biweekly" ? 14 : 7) * MS;
+    const lenMs = 7 * MS;
 
     const k = Math.floor((now7 - anchor7) / lenMs);
-    const startMs = anchor7 + k * lenMs;        // period start (UTC+7 wall clock)
-    const endMs = startMs + lenMs;              // reset moment (UTC+7 wall clock)
-    const lastDayMs = endMs - MS;               // last day shown (the Sunday)
+    const startMs = anchor7 + k * lenMs;
+    const endMs = startMs + lenMs;
+    const lastDayMs = endMs - MS;
 
-    const fmt = (ms) => new Date(ms).toLocaleDateString("en-US",
-        { month: "short", day: "numeric", timeZone: "UTC" });
+    const fmt = ms => new Date(ms).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        timeZone: "UTC"
+    });
 
     return {
         label: fmt(startMs) + " – " + fmt(lastDayMs),
-        resetMs: endMs - OFFSET                 // back to a real UTC instant
+        resetMs: endMs - OFFSET
     };
 }
 
 function attResetCountdown(resetMs){
     let diff = Math.max(0, resetMs - Date.now());
-    const d = Math.floor(diff / 86400000); diff -= d * 86400000;
-    const h = Math.floor(diff / 3600000);   diff -= h * 3600000;
+
+    const d = Math.floor(diff / 86400000);
+    diff -= d * 86400000;
+
+    const h = Math.floor(diff / 3600000);
+    diff -= h * 3600000;
+
     const m = Math.floor(diff / 60000);
+
     if(d > 0) return d + "d " + h + "h";
     if(h > 0) return h + "h " + m + "m";
     return m + "m";
@@ -623,10 +636,12 @@ function attResetCountdown(resetMs){
 function openAttendance(){
     const popup = document.getElementById("attendancePopup");
     if(!popup) return;
-    attendanceCache = {};                      // always pull fresh data on open
+
+    attendanceCache = null;
     popup.classList.add("active");
     document.body.style.overflow = "hidden";
-    switchAttendance(attendanceTab || "main");
+
+    loadMainAttendance();
 
     clearInterval(attendanceTimer);
     attendanceTimer = setInterval(updateAttendanceMeta, 30000);
@@ -635,55 +650,57 @@ function openAttendance(){
 function closeAttendance(){
     const popup = document.getElementById("attendancePopup");
     if(popup) popup.classList.remove("active");
+
     document.body.style.overflow = "auto";
+
     clearInterval(attendanceTimer);
     attendanceTimer = null;
 }
 
-function switchAttendance(guild){
-    attendanceTab = guild;
-
-    document.querySelectorAll(".att-tab").forEach(t => {
-        t.classList.toggle("active", t.dataset.guild === guild);
-    });
-
-    updateAttendanceMeta();
-
+function loadMainAttendance(){
     const listEl = document.getElementById("attendanceList");
     if(!listEl) return;
 
-    if(attendanceCache[guild]){
-        renderAttendance(attendanceCache[guild]);
+    updateAttendanceMeta();
+
+    if(attendanceCache){
+        renderAttendance(attendanceCache);
         return;
     }
 
-    listEl.innerHTML = '<div class="att-state"><div class="att-spin"></div><div>Loading sheet…</div></div>';
+    listEl.innerHTML =
+        '<div class="att-state"><div class="att-spin"></div><div>Loading Main Guild attendance…</div></div>';
 
-    const cfg = ATTENDANCE_SHEETS[guild];
+    const cfg = ATTENDANCE_SHEETS.main;
+
     gvizLoad(cfg.id, cfg.gid)
         .then(table => {
             const data = parseAttendance(table, cfg.nameCol, cfg.scoreCol);
-            attendanceCache[guild] = data;
-            if(attendanceTab === guild) renderAttendance(data);
+            attendanceCache = data;
+            renderAttendance(data);
         })
         .catch(err => {
-            if(attendanceTab !== guild) return;
             listEl.innerHTML =
-                '<div class="att-state err">Couldn\'t load the sheet (' + attEscape(err.message) + ').<br>' +
-                'Make sure it\'s shared as “Anyone with the link · Viewer”.</div>';
+                '<div class="att-state err">Couldn\\'t load the sheet (' +
+                attEscape(err.message) +
+                ').<br>Make sure it\\'s shared as “Anyone with the link · Viewer”.</div>';
         });
 }
 
 function updateAttendanceMeta(){
-    const cfg = ATTENDANCE_SHEETS[attendanceTab];
-    if(!cfg) return;
-    const info = attPeriodInfo(cfg.cadence);
-    const cadenceLabel = cfg.cadence === "biweekly" ? "2-week" : "weekly";
+    const info = attPeriodInfo();
 
     const periodEl = document.getElementById("attPeriod");
     const resetEl = document.getElementById("attReset");
-    if(periodEl) periodEl.innerHTML = cadenceLabel + " · <b>" + info.label + "</b>";
-    if(resetEl) resetEl.innerHTML = "resets in <b>" + attResetCountdown(info.resetMs) + "</b>";
+
+    if(periodEl){
+        periodEl.innerHTML = "weekly · <b>" + info.label + "</b>";
+    }
+
+    if(resetEl){
+        resetEl.innerHTML =
+            "resets in <b>" + attResetCountdown(info.resetMs) + "</b>";
+    }
 }
 
 function renderAttendance(data){
@@ -691,25 +708,25 @@ function renderAttendance(data){
     if(!listEl) return;
 
     if(!data.length){
-        listEl.innerHTML = '<div class="att-state">No attendance recorded yet for this period.</div>';
+        listEl.innerHTML =
+            '<div class="att-state">No attendance recorded yet for this period.</div>';
         return;
     }
 
     listEl.innerHTML = data.map((p, i) => {
         const rank = i + 1;
+
         const medal = rank === 1 ? "att-top att-gold"
                     : rank === 2 ? "att-top att-silver"
                     : rank === 3 ? "att-top att-bronze" : "";
+
         return '<div class="att-row ' + medal + '">' +
-                   '<span class="att-rank">' + rank + '</span>' +
-                   '<span class="att-name">' + attEscape(p.name) + '</span>' +
-                   '<span class="att-score">' + p.score + '</span>' +
-               '</div>';
+            '<span class="att-rank">' + rank + '</span>' +
+            '<span class="att-name">' + attEscape(p.name) + '</span>' +
+            '<span class="att-score">' + p.score + '</span>' +
+            '</div>';
     }).join("");
 }
-
-
-
 
 /* ===== FULL BOSS LIST ===== */
 
