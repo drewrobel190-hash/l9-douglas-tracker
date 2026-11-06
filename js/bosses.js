@@ -111,7 +111,7 @@ const bosses = [
 },
 
 { name:"Clemantis", type:"fixed",
-schedule:[{day:1,time:"11:30"},{day:4,time:"19:00"}],
+schedule:[{day:1,time:"11:30"},{day:4,time:"17:00"}],
 image:"Pictures/Clemantis.png",
 info: "Level 70 Field Boss",
 location: "Corrupted Basin > White Witch Cradle",
@@ -143,7 +143,7 @@ disabled: false,
 },
 
 { name:"Milavy", type:"fixed",
-schedule:[{day:6,time:"15:00"}],
+schedule:[{day:6,time:"16:00"}],
 image:"Pictures/Milavy.png",
 info: "Level 70 Field Boss",
 location: "Corrupted Basin > Milavy's Cave",
@@ -151,7 +151,7 @@ disabled: false
 },
 
 { name:"Ringor", type:"fixed",
-schedule:[{day:6,time:"17:00"}],
+schedule:[{day:6,time:"14:00"}],
 image:"Pictures/Ringor.png",
 info: "Level 70 Field Boss",
 location: "Corrupted Basin > Ringor's Cave"
@@ -172,7 +172,7 @@ location: "Corrupted Basin > Auraq's Cave"
 },
 
 { name:"Chaiflock", type:"fixed",
-schedule:[{day:7,time:"15:00"}],
+schedule:[{day:0,time:"15:00"}],
 image:"Pictures/Chaiflock.png",
 info: "Level 70 Field Boss",
 location: "Corrupted Basin > Chaiflock's Cave"
@@ -222,7 +222,9 @@ schedule:[{day:0,time:"19:00"}],
 image:"Pictures/Dumenta.png"
 },
 
-{ name:"Lucus", type:"fixed",
+{ name:"Lucus", 
+ type:"fixed",
+  disabled: true,
 schedule:[{day:6,time:"22:00"}],
 image:"Pictures/Lucus.png"
 },
@@ -231,7 +233,7 @@ image:"Pictures/Lucus.png"
   name: "Icaruthia",
   type: "fixed",
   continent: "Kransia",
-  disabled: false,
+  disabled: true,
   schedule: [
     { day: 2, time: "21:00" },
     { day: 5, time: "21:00" }
@@ -243,7 +245,7 @@ image:"Pictures/Lucus.png"
   name: "Motti",
   type: "fixed",
   continent: "Kransia",
-  disabled: false,
+  disabled: true,
   schedule: [
     { day: 3, time: "19:00" },  // Wednesday
     { day: 6, time: "19:00" }   // Saturday
@@ -255,7 +257,7 @@ image:"Pictures/Lucus.png"
   name: "Nevaeh",
   type: "fixed",
   continent: "Kransia",
-  disabled: false,
+  disabled: true,
   schedule: [
     { day: 0, time: "22:00" }   // Sunday
   ],
