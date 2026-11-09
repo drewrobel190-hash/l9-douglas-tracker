@@ -508,7 +508,7 @@ function restoreAdminSession(){
 const ATTENDANCE_SHEETS = {
     main: {
         id: "1JV3HBq2OX4OXYWDxRLxSwUPibQLPQywBjIK8dD4uN7U",
-        gid: "2052081881",
+        gid: "2105997609",
         nameCol: 0,
         scoreCol: 2,
         label: "Main Guild",
