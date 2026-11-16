@@ -909,7 +909,7 @@ function renderTodaySchedule(){
    timezone (Philippines = +1h). Shows Today + Tomorrow. ---- */
 const SCHEDULE_SHEET = {
     id: "1ZhK_aO2nLzLcMgrb1jWw3DOctlkR1US_CciHd_E2GZI",
-    gid: "921196904",
+    gid: "2044539041",
     nameCol: 1,   // "NAME-EN"
     dateCol: 0,   // column A — a real datetime, filled even for fixed bosses (where Day Spawn = "None")
     timeCol: 3    // "Day Spawn" string  e.g. "Tue, 23/06/2026 19:00"  (fallback)
