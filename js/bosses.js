@@ -269,6 +269,10 @@ image:"Pictures/Lucus.png"
 schedule:[{day:1,time:"22:00"}],
 image:"Pictures/Tumier.png"},
 
+{ name:"Guild Boss", type:"fixed",
+schedule:[{day:0,time:"21:30"}],
+image:"Pictures/Tumier.png"},
+
 // ===== WORLD BOSSES =====
 
 {
