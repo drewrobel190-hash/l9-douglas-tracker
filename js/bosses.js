@@ -271,7 +271,7 @@ image:"Pictures/Tumier.png"},
 
 { name:"Guild Boss", type:"fixed",
 schedule:[{day:0,time:"21:30"}],
-image:"Pictures/Tumier.png"},
+image:"Pictures/Tumi.png"},
 
 // ===== WORLD BOSSES =====
 
